@@ -1,0 +1,24 @@
+{
+  "name": "cpt",
+  "version": "0.0.1",
+  "description": "A template for npm module use coffee script",
+  "main": "index.js",
+  "scripts": {
+    "test": "gulp mocha"
+  },
+  "keywords": [
+    "github",
+    "coffee",
+    "bootstrap"
+  ],
+  "author": "xeodou@gmail.com",
+  "license": "MIT",
+  "devDependencies": {
+    "gulp": "^3.6.2",
+    "gulp-coffee": "^1.4.3",
+    "gulp-coffeelint": "^0.3.2",
+    "gulp-util": "^2.2.14",
+    "gulp-mocha": "^0.4.1",
+    "should": "^3.3.1"
+  }
+}
