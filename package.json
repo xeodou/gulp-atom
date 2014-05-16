@@ -11,6 +11,10 @@
     "coffee",
     "bootstrap"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/xeodou/cpt.git"
+  },
   "author": "xeodou@gmail.com",
   "license": "MIT",
   "devDependencies": {
