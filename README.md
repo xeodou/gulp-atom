@@ -1,35 +1,41 @@
-# CPT
+# Gulp atom release plugin
 
-> A template for npm module use coffee script
+> A gulp plugin for atom-shell distribute applications.
 
-## Getting Started
-
-### First
-Install `gulp`.
-If you haven't use `Gulp` , I think you should use it to save your short life.
-To install `gulp` you can have a look at this repo https://github.com/gulpjs/gulp or just use this command:
-
-```shell
-    npm i -g gulp
-```
-
-### Second
-Clone this repo:
-
-```shell
-    git clone git@github.com:xeodou/CPT.git
-```
 
 ## Usage
 
-### Compile Coffee Script
 
-Use `gulp coffee` transfer coffeescript to javascript.
+Add a gulp atom task like :
 
-### Test
+```
+gulp.task('atom', function() {
 
-Use `gulp mocha` to test your code with mocha.
+    return gulpAtom({
+        srcPath: './src',
+        releasePath: './release',
+        cachePath: './cache',
+        version: 'v0.12.4',
+        rebuild: true,
+        platforms: ['win']
+    });
+});
 
+```
+
+Add run with `gulp atom` will release the application in `outputDir` .
+When you run code under `process.NODE_ENV = test` will out put more debug informations.
+
+### `options`
+
+* `cachePath` is where the package download path, **required**.
+* `srcPath` is where the src code need to package, **required**.
+* `releasePath` is where the release applictions path, **required**.
+* `platforms` support `['darwin or osx ', 'win32 or win', 'linux']`, default is `drawin`.
+* apm is where the `atom-package-manager` command path, default using the global `apm`.
+* rebuild default is `false`, when set `true` will rebuild the native `atom` modules.
+* symbols defualt is `false`, when set `true` will download the symbols package from github.
+* version the special package need download from github, **required**.
 
 
 
