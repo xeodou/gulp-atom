@@ -4,7 +4,7 @@
 
 ## Install
 
-Install with [npm](https://npmjs.org/package/gulp-clean).
+Install with [npm](https://npmjs.org/package/gulp-atom).
 
 ```sh
 npm install --save-dev gulp-atom
