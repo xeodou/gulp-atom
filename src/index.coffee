@@ -1,12 +1,13 @@
 
 fs = require 'fs'
-grw = require 'grw'
+grs = require 'grs'
 path = require 'path'
 async = require 'async'
 wrench = require 'wrench'
 util = require 'gulp-util'
 through2 = require 'through2'
 childProcess = require 'child_process'
+ProgressBar = require 'progress'
 
 
 PLUGIN_NAME = 'gulp-atom-shell'
@@ -22,7 +23,6 @@ module.exports = atom = (options)->
     #    symbols
     #    version
     #    repo
-    #    prefix
     options = (options or {})
 
     if not options.releasePath or not options.version or
@@ -33,39 +33,63 @@ module.exports = atom = (options)->
     options.apm ?= getApmPath()
     options.symbols ?= false
     options.rebuild ?= false
+    options.ext ?= 'zip'
 
-    platforms = ['darwin', 'win32', 'linux']
-    async.each options.platforms,
+    options.platforms = [options.platforms] if typeof options.platforms is 'string'
+
+    stream = through2()
+
+    platforms = ['darwin',
+    'win32',
+    'linux',
+    'darwin-x64',
+    'linux-ia32',
+    'linux-x64',
+    'win32-ia32',
+    'win64-64']
+
+    async.eachSeries options.platforms,
         (platform, callback) ->
             platform = 'darwin' if platform is 'osx'
             platform = 'win32' if platform is 'win'
 
             if platforms.indexOf(platform) < 0
-                util.log PLUGIN_NAME, "Not support platform #{platform}"
+                stream.emit 'error', "Not support platform #{platform}"
                 return callback()
 
+            pkg = "atom-shell-#{options.version}-#{platform}"
+            pkg += '-symbols' if options.symbols
+            pkg += ".#{options.ext}"
+
             cachePath = path.resolve options.cachePath, options.version
-            cacheFile = path.resolve cachePath, "atom-shell-#{platform}.zip"
+            cacheFile = path.resolve cachePath, pkg
             releasePath = path.resolve options.releasePath, options.version, platform
 
             async.series [
                 # If not downloaded then download the special package.
                 (next)->
                     if not isFile(cacheFile)
-                        util.log PLUGIN_NAME,
-                        "#{platform} #{options.version} atom-shell package is downloading..."
                         wrench.mkdirSyncRecursive cachePath
-
-                        options.repo = 'atom/atom-shell'
-                        options.prefix = "atom-shell-#{options.version}-#{platform}"
-                        options.prefix += '-symbols' if options.symbols
-                        options.ext = 'zip'
-
                         # Download atom package throw stream.
-                        grw(options).pipe(fs.createWriteStream(cacheFile))
+                        bar = null
+                        grs
+                            repo: 'atom/atom-shell'
+                            tag: options.version
+                            name: pkg
+                        .on 'error', (error) ->
+                             stream.emit 'error', error
+                        .on 'size', (size) ->
+                            bar = new ProgressBar "#{pkg} [:bar] :percent :etas",
+                                complete: '>'
+                                incomplete: ' '
+                                width: 20
+                                total: size
+                        .pipe through2 (chunk, enc, cb) ->
+                            bar.tick chunk.length
+                            @push(chunk)
+                            cb()
+                        .pipe(fs.createWriteStream(cacheFile))
                         .on 'close', ->
-                            util.log PLUGIN_NAME,
-                            "#{platform} #{options.version} atom-shell package is downloaded."
                             next()
                         .on 'error', next
                     else next()
@@ -90,21 +114,24 @@ module.exports = atom = (options)->
 
                 # Distribute.
                 (next) ->
-                    util.log PLUGIN_NAME, 'Distribute applications.'
+                    util.log PLUGIN_NAME, "#{pkg} distribute done."
                     _src = 'resources/app'
-                    _src = 'Atom.app/Contents/Resources/app/' if platform is 'darwin'
+                    _src = 'Atom.app/Contents/Resources/app/' if platform.indexOf('darwin') >= 0
                     wrench.mkdirSyncRecursive path.join releasePath , _src
                     wrench.copyDirSyncRecursive options.srcPath, path.join(releasePath , _src),
                     forceDelete: true
                     excludeHiddenUnix: false
                     inflateSymlinks: false
+                    next()
 
             ], (error, results) ->
                 callback error
 
         (error) ->
-            return util.log PLUGIN_NAME, error.message if error
+            stream.emit 'error', error if error
+            stream.emit 'end', {}
 
+    return stream
 
 isFile = ->
     filepath = path.join.apply path, arguments
