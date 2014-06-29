@@ -8,6 +8,7 @@ util = require 'gulp-util'
 through2 = require 'through2'
 childProcess = require 'child_process'
 ProgressBar = require 'progress'
+File = require 'vinyl'
 
 
 PLUGIN_NAME = 'gulp-atom-shell'
@@ -37,7 +38,7 @@ module.exports = atom = (options)->
 
     options.platforms = [options.platforms] if typeof options.platforms is 'string'
 
-    stream = through2()
+    stream = through2.obj()
 
     platforms = ['darwin',
     'win32',
@@ -122,14 +123,26 @@ module.exports = atom = (options)->
                     forceDelete: true
                     excludeHiddenUnix: false
                     inflateSymlinks: false
-                    next()
+                    next null, platform.indexOf('darwin') < 0 and
+                      releasePath or
+                      path.join releasePath, 'Atom.app'
 
             ], (error, results) ->
+                [...,releaseDir] = results
+                execution = switch
+                    when platform.indexOf('darwin') >= 0 then 'Contents/MacOS/Atom'
+                    when platform.indexOf('win') >= 0 then 'atom.exe'
+                    else 'atom'
+
+                stream.write new File
+                    base: releaseDir
+                    path: path.join releaseDir, execution
+
                 callback error
 
         (error) ->
             stream.emit 'error', error if error
-            stream.emit 'end', {}
+            stream.end()
 
     return stream
 
