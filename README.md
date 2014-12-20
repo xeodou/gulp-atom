@@ -16,13 +16,16 @@ npm install --save-dev gulp-atom
 Add a gulp atom task like :
 
 ```js
+var gulp = require('gulp');
+var gulpAtom = require('gulp-atom');
+
 gulp.task('atom', function() {
 
     return gulpAtom({
         srcPath: './src',
         releasePath: './release',
         cachePath: './cache',
-        version: 'v0.13.0',
+        version: 'v0.20.0',
         rebuild: false,
         platforms: ['win32-ia32', 'darwin-x64']
     });
