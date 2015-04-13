@@ -47,7 +47,7 @@ module.exports = atom = (options)->
     'linux-ia32',
     'linux-x64',
     'win32-ia32',
-    'win64-64']
+    'win32-x64']
 
     async.eachSeries options.platforms,
         (platform, callback) ->
