@@ -9,9 +9,11 @@ through2 = require 'through2'
 childProcess = require 'child_process'
 ProgressBar = require 'progress'
 File = require 'vinyl'
+semver = require 'semver'
 
 
 PLUGIN_NAME = 'gulp-atom-shell'
+
 
 module.exports = atom = (options)->
     # Options should be like
@@ -38,6 +40,9 @@ module.exports = atom = (options)->
 
     options.platforms = [options.platforms] if typeof options.platforms is 'string'
 
+    isElectron = semver.gte(options.version.replace('v',''), '0.24.0')
+    pkgName = if isElectron then "Electron" else "Atom"
+
     stream = through2.obj()
 
     platforms = ['darwin',
@@ -57,8 +62,9 @@ module.exports = atom = (options)->
             if platforms.indexOf(platform) < 0
                 stream.emit 'error', "Not support platform #{platform}"
                 return callback()
-
-            pkg = "atom-shell-#{options.version}-#{platform}"
+            options.version ?= "v0.24.0"
+            repo = if isElectron then 'electron' else 'atom-shell'
+            pkg = "#{repo}-#{options.version}-#{platform}"
             pkg += '-symbols' if options.symbols
             pkg += ".#{options.ext}"
 
@@ -74,7 +80,7 @@ module.exports = atom = (options)->
                         # Download atom package throw stream.
                         bar = null
                         grs
-                            repo: 'atom/atom-shell'
+                            repo: "atom/electron"
                             tag: options.version
                             name: pkg
                         .on 'error', (error) ->
@@ -117,7 +123,8 @@ module.exports = atom = (options)->
                 (next) ->
                     util.log PLUGIN_NAME, "#{pkg} distribute done."
                     _src = 'resources/app'
-                    _src = 'Atom.app/Contents/Resources/app/' if platform.indexOf('darwin') >= 0
+                    if platform.indexOf('darwin') >= 0
+                        _src = "#{pkgName}.app/Contents/Resources/app/"
                     wrench.mkdirSyncRecursive path.join releasePath , _src
                     wrench.copyDirSyncRecursive options.srcPath, path.join(releasePath , _src),
                     forceDelete: true
@@ -125,14 +132,14 @@ module.exports = atom = (options)->
                     inflateSymlinks: false
                     next null, platform.indexOf('darwin') < 0 and
                       releasePath or
-                      path.join releasePath, 'Atom.app'
+                      path.join releasePath, "#{pkgName}.app"
 
             ], (error, results) ->
                 [...,releaseDir] = results
                 execution = switch
-                    when platform.indexOf('darwin') >= 0 then 'Contents/MacOS/Atom'
-                    when platform.indexOf('win') >= 0 then 'atom.exe'
-                    else 'atom'
+                    when platform.indexOf('darwin') >= 0 then "Contents/MacOS/#{pkgName}"
+                    when platform.indexOf('win') >= 0 then "#{pkgName.toLowerCase()}.exe"
+                    else pkgName.toLowerCase()
 
                 stream.write new File
                     base: releaseDir
