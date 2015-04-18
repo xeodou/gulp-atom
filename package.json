@@ -1,6 +1,6 @@
 {
   "name": "gulp-atom",
-  "version": "0.0.6",
+  "version": "0.1.0",
   "description": "A gulp plugin for atom-shell distribute applications.",
   "main": "index.js",
   "scripts": {
