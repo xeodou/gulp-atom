@@ -8,6 +8,8 @@
   },
   "keywords": [
     "gulp",
+    "electron",
+    "atom",
     "atom-shell"
   ],
   "repository": {

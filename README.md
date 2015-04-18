@@ -1,6 +1,6 @@
 # [gulp](https://github.com/wearefractal/gulp)-atom [![NPM version](https://badge.fury.io/js/gulp-atom.png)](http://badge.fury.io/js/gulp-atom)
 
-> A gulp plugin that creates atom-shell based distributable applications.
+> A gulp plugin that creates [Electron]([electron](https://github.com/atom/electron/)) *which is atom-shell* based distributable applications.
 
 ## Install
 
@@ -12,6 +12,8 @@ npm install --save-dev gulp-atom
 
 ## Usage
 
+*After atom-shell 0.24, atom team change the name to [electron](https://github.com/atom/electron/)*
+*If you want use with 0.24 or later please upgrade gulp-atom to verions 0.1.0 or later*
 
 Add a gulp atom task like :
 
