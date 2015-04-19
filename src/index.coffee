@@ -11,9 +11,9 @@ ProgressBar = require 'progress'
 File = require 'vinyl'
 
 
-PLUGIN_NAME = 'gulp-atom-shell'
+PLUGIN_NAME = 'gulp-electron'
 
-module.exports = atom = (options)->
+module.exports = electron = (options) ->
     # Options should be like
     #    cachePath
     #    srcPath
@@ -58,7 +58,7 @@ module.exports = atom = (options)->
                 stream.emit 'error', "Not support platform #{platform}"
                 return callback()
 
-            pkg = "atom-shell-#{options.version}-#{platform}"
+            pkg = "electron-#{options.version}-#{platform}"
             pkg += '-symbols' if options.symbols
             pkg += ".#{options.ext}"
 
@@ -68,13 +68,13 @@ module.exports = atom = (options)->
 
             async.series [
                 # If not downloaded then download the special package.
-                (next)->
+                (next) ->
                     if not isFile(cacheFile)
                         wrench.mkdirSyncRecursive cachePath
-                        # Download atom package throw stream.
+                        # Download electron package throw stream.
                         bar = null
                         grs
-                            repo: 'atom/atom-shell'
+                            repo: 'atom/electron'
                             tag: options.version
                             name: pkg
                         .on 'error', (error) ->
@@ -94,14 +94,12 @@ module.exports = atom = (options)->
                             next()
                         .on 'error', next
                     else next()
-
-
                 # If not unziped then unzip the zip file.
                 # Check if there already have an version file.
                 (next) ->
                     if not isFile path.resolve releasePath, 'version'
                         wrench.mkdirSyncRecursive releasePath
-                        util.log PLUGIN_NAME, "unzip #{platform} #{options.version} atom-shell."
+                        util.log PLUGIN_NAME, "unzip #{platform} #{options.version} electron."
                         spawn {cmd: 'unzip', args: ['-o', cacheFile, '-d', releasePath]}, next
                     else next()
 
@@ -117,22 +115,23 @@ module.exports = atom = (options)->
                 (next) ->
                     util.log PLUGIN_NAME, "#{pkg} distribute done."
                     _src = 'resources/app'
-                    _src = 'Atom.app/Contents/Resources/app/' if platform.indexOf('darwin') >= 0
+                    if platform.indexOf('darwin') >= 0
+                        _src = 'Electron.app/Contents/Resources/app/'
                     wrench.mkdirSyncRecursive path.join releasePath , _src
                     wrench.copyDirSyncRecursive options.srcPath, path.join(releasePath , _src),
-                    forceDelete: true
-                    excludeHiddenUnix: false
-                    inflateSymlinks: false
+                        forceDelete: true
+                        excludeHiddenUnix: false
+                        inflateSymlinks: false
                     next null, platform.indexOf('darwin') < 0 and
-                      releasePath or
-                      path.join releasePath, 'Atom.app'
+                        releasePath or
+                        path.join releasePath, 'Electron.app'
 
             ], (error, results) ->
                 [...,releaseDir] = results
                 execution = switch
-                    when platform.indexOf('darwin') >= 0 then 'Contents/MacOS/Atom'
-                    when platform.indexOf('win') >= 0 then 'atom.exe'
-                    else 'atom'
+                    when platform.indexOf('darwin') >= 0 then 'Contents/MacOS/Electron'
+                    when platform.indexOf('win') >= 0 then 'electron.exe'
+                    else 'electron'
 
                 stream.write new File
                     base: releaseDir
