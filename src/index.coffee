@@ -14,160 +14,160 @@ File = require 'vinyl'
 PLUGIN_NAME = 'gulp-electron'
 
 module.exports = electron = (options) ->
-    # Options should be like
-    #    cachePath
-    #    srcPath
-    #    releasePath
-    #    platforms: ['darwin', 'win32', 'linux']
-    #    apm
-    #    rebuild
-    #    symbols
-    #    version
-    #    repo
-    options = (options or {})
+  # Options should be like
+  #  cachePath
+  #  srcPath
+  #  releasePath
+  #  platforms: ['darwin', 'win32', 'linux']
+  #  apm
+  #  rebuild
+  #  symbols
+  #  version
+  #  repo
+  options = (options or {})
 
-    if not options.releasePath or not options.version or
-     not options.srcPath or not options.cachePath
-        throw new util.PluginError 'Miss version or release path.'
+  if not options.releasePath or not options.version or
+   not options.srcPath or not options.cachePath
+    throw new util.PluginError 'Miss version or release path.'
 
-    options.platforms ?= ['darwin']
-    options.apm ?= getApmPath()
-    options.symbols ?= false
-    options.rebuild ?= false
-    options.ext ?= 'zip'
+  options.platforms ?= ['darwin']
+  options.apm ?= getApmPath()
+  options.symbols ?= false
+  options.rebuild ?= false
+  options.ext ?= 'zip'
 
-    options.platforms = [options.platforms] if typeof options.platforms is 'string'
+  options.platforms = [options.platforms] if typeof options.platforms is 'string'
 
-    stream = through2.obj()
+  stream = through2.obj()
 
-    platforms = ['darwin',
-    'win32',
-    'linux',
-    'darwin-x64',
-    'linux-ia32',
-    'linux-x64',
-    'win32-ia32',
-    'win32-x64']
+  platforms = ['darwin',
+  'win32',
+  'linux',
+  'darwin-x64',
+  'linux-ia32',
+  'linux-x64',
+  'win32-ia32',
+  'win32-x64']
 
-    async.eachSeries options.platforms,
-        (platform, callback) ->
-            platform = 'darwin' if platform is 'osx'
-            platform = 'win32' if platform is 'win'
+  async.eachSeries options.platforms,
+    (platform, callback) ->
+      platform = 'darwin' if platform is 'osx'
+      platform = 'win32' if platform is 'win'
 
-            if platforms.indexOf(platform) < 0
-                stream.emit 'error', "Not support platform #{platform}"
-                return callback()
+      if platforms.indexOf(platform) < 0
+        stream.emit 'error', "Not support platform #{platform}"
+        return callback()
 
-            pkg = "electron-#{options.version}-#{platform}"
-            pkg += '-symbols' if options.symbols
-            pkg += ".#{options.ext}"
+      pkg = "electron-#{options.version}-#{platform}"
+      pkg += '-symbols' if options.symbols
+      pkg += ".#{options.ext}"
 
-            cachePath = path.resolve options.cachePath, options.version
-            cacheFile = path.resolve cachePath, pkg
-            releasePath = path.resolve options.releasePath, options.version, platform
+      cachePath = path.resolve options.cachePath, options.version
+      cacheFile = path.resolve cachePath, pkg
+      releasePath = path.resolve options.releasePath, options.version, platform
 
-            async.series [
-                # If not downloaded then download the special package.
-                (next) ->
-                    if not isFile(cacheFile)
-                        wrench.mkdirSyncRecursive cachePath
-                        # Download electron package throw stream.
-                        bar = null
-                        grs
-                            repo: 'atom/electron'
-                            tag: options.version
-                            name: pkg
-                        .on 'error', (error) ->
-                             stream.emit 'error', error
-                        .on 'size', (size) ->
-                            bar = new ProgressBar "#{pkg} [:bar] :percent :etas",
-                                complete: '>'
-                                incomplete: ' '
-                                width: 20
-                                total: size
-                        .pipe through2 (chunk, enc, cb) ->
-                            bar.tick chunk.length
-                            @push(chunk)
-                            cb()
-                        .pipe(fs.createWriteStream(cacheFile))
-                        .on 'close', ->
-                            next()
-                        .on 'error', next
-                    else next()
-                # If not unziped then unzip the zip file.
-                # Check if there already have an version file.
-                (next) ->
-                    if not isFile path.resolve releasePath, 'version'
-                        wrench.mkdirSyncRecursive releasePath
-                        util.log PLUGIN_NAME, "unzip #{platform} #{options.version} electron."
-                        spawn {cmd: 'unzip', args: ['-o', cacheFile, '-d', releasePath]}, next
-                    else next()
+      async.series [
+        # If not downloaded then download the special package.
+        (next) ->
+          if not isFile(cacheFile)
+            wrench.mkdirSyncRecursive cachePath
+            # Download electron package throw stream.
+            bar = null
+            grs
+              repo: 'atom/electron'
+              tag: options.version
+              name: pkg
+            .on 'error', (error) ->
+               stream.emit 'error', error
+            .on 'size', (size) ->
+              bar = new ProgressBar "#{pkg} [:bar] :percent :etas",
+                complete: '>'
+                incomplete: ' '
+                width: 20
+                total: size
+            .pipe through2 (chunk, enc, cb) ->
+              bar.tick chunk.length
+              @push(chunk)
+              cb()
+            .pipe(fs.createWriteStream(cacheFile))
+            .on 'close', ->
+              next()
+            .on 'error', next
+          else next()
+        # If not unziped then unzip the zip file.
+        # Check if there already have an version file.
+        (next) ->
+          if not isFile path.resolve releasePath, 'version'
+            wrench.mkdirSyncRecursive releasePath
+            util.log PLUGIN_NAME, "unzip #{platform} #{options.version} electron."
+            spawn {cmd: 'unzip', args: ['-o', cacheFile, '-d', releasePath]}, next
+          else next()
 
-                # If rebuild
-                # then rebuild the native module.
-                (next) ->
-                    if options.rebuild
-                        util.log PLUGIN_NAME, "Rebuilding modules"
-                        spawn { cmd: options.apm, args: ['rebuild'] }, next
-                    else next()
+        # If rebuild
+        # then rebuild the native module.
+        (next) ->
+          if options.rebuild
+            util.log PLUGIN_NAME, "Rebuilding modules"
+            spawn {cmd: options.apm, args: ['rebuild']}, next
+          else next()
 
-                # Distribute.
-                (next) ->
-                    util.log PLUGIN_NAME, "#{pkg} distribute done."
-                    _src = 'resources/app'
-                    if platform.indexOf('darwin') >= 0
-                        _src = 'Electron.app/Contents/Resources/app/'
-                    wrench.mkdirSyncRecursive path.join releasePath , _src
-                    wrench.copyDirSyncRecursive options.srcPath, path.join(releasePath , _src),
-                        forceDelete: true
-                        excludeHiddenUnix: false
-                        inflateSymlinks: false
-                    next null, platform.indexOf('darwin') < 0 and
-                        releasePath or
-                        path.join releasePath, 'Electron.app'
+        # Distribute.
+        (next) ->
+          util.log PLUGIN_NAME, "#{pkg} distribute done."
+          _src = 'resources/app'
+          if platform.indexOf('darwin') >= 0
+            _src = 'Electron.app/Contents/Resources/app/'
+          wrench.mkdirSyncRecursive path.join releasePath , _src
+          wrench.copyDirSyncRecursive options.srcPath, path.join(releasePath , _src),
+            forceDelete: true
+            excludeHiddenUnix: false
+            inflateSymlinks: false
+          next null, platform.indexOf('darwin') < 0 and
+            releasePath or
+            path.join releasePath, 'Electron.app'
 
-            ], (error, results) ->
-                [...,releaseDir] = results
-                execution = switch
-                    when platform.indexOf('darwin') >= 0 then 'Contents/MacOS/Electron'
-                    when platform.indexOf('win') >= 0 then 'electron.exe'
-                    else 'electron'
+      ], (error, results) ->
+        [...,releaseDir] = results
+        execution = switch
+          when platform.indexOf('darwin') >= 0 then 'Contents/MacOS/Electron'
+          when platform.indexOf('win') >= 0 then 'electron.exe'
+          else 'electron'
 
-                stream.write new File
-                    base: releaseDir
-                    path: path.join releaseDir, execution
+        stream.write new File
+          base: releaseDir
+          path: path.join releaseDir, execution
 
-                callback error
+        callback error
 
-        (error) ->
-            stream.emit 'error', error if error
-            stream.end()
+    (error) ->
+      stream.emit 'error', error if error
+      stream.end()
 
-    return stream
+  return stream
 
 isFile = ->
-    filepath = path.join.apply path, arguments
-    fs.existsSync(filepath) and fs.statSync(filepath).isFile()
+  filepath = path.join.apply path, arguments
+  fs.existsSync(filepath) and fs.statSync(filepath).isFile()
 
 getApmPath = ->
-    apmPath = path.join 'apm', 'node_modules', 'atom-package-manager', 'bin', 'apm'
-    apmPath = 'apm' unless isFile apmPath
+  apmPath = path.join 'apm', 'node_modules', 'atom-package-manager', 'bin', 'apm'
+  apmPath = 'apm' unless isFile apmPath
 
 spawn = (options, callback) ->
-    stdout = []
-    stderr = []
-    error = null
-    proc = childProcess.spawn options.cmd, options.args, options.opts
-    proc.stdout.on 'data', (data) ->
-        stdout.push data.toString()
-        if process.NODE_ENV is 'test'
-            util.log data.toString()
-    proc.stderr.on 'data', (data) ->
-        stderr.push data.toString()
-    proc.on 'exit', (code, signal) ->
-        error = new Error(signal) if code != 0
-        results = stderr: stderr.join(''), stdout: stdout.join(''), code: code
-        if code != 0
-            throw new util.PluginError PLUGIN_NAME, results.stderr or
-             'unknow error , maybe you can try delete the zip packages.'
-        callback error, results
+  stdout = []
+  stderr = []
+  error = null
+  proc = childProcess.spawn options.cmd, options.args, options.opts
+  proc.stdout.on 'data', (data) ->
+    stdout.push data.toString()
+    if process.NODE_ENV is 'test'
+      util.log data.toString()
+  proc.stderr.on 'data', (data) ->
+    stderr.push data.toString()
+  proc.on 'exit', (code, signal) ->
+    error = new Error(signal) if code isnt 0
+    results = stderr: stderr.join(''), stdout: stdout.join(''), code: code
+    if code isnt 0
+      throw new util.PluginError PLUGIN_NAME, results.stderr or
+       'unknow error , maybe you can try delete the zip packages.'
+    callback error, results

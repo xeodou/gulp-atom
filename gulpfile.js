@@ -15,14 +15,7 @@ var tests = 'test/*.mocha.js';
 // Coffee Lint
 gulp.task('lint', function() {
     gulp.src(src)
-        .pipe(coffeelint({
-            max_line_length: {
-                value: 100
-            },
-            indentation: {
-                value: 4
-            }
-        }))
+        .pipe(coffeelint())
         .pipe(coffeelint.reporter());
 });
 
