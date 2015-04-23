@@ -9,7 +9,8 @@ process.NODE_ENV = 'test';
 
 gulp.task('electron', function() {
 
-    return electron({
+    gulp.src("")
+    .pipe(electron({
         src: './src',
         packageJson: packageJson,
         release: './release',
@@ -17,7 +18,8 @@ gulp.task('electron', function() {
         version: 'v0.24.0',
         rebuild: false,
         platforms: ['win32-ia32', 'darwin-x64']
-    });
+    }))
+    .pipe(gulp.dest(""));
 });
 
 gulp.task('default', ['electron']);
