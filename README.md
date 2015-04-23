@@ -22,9 +22,9 @@ var electron = require('gulp-electron');
 gulp.task('electron', function() {
 
     return electron({
-        srcPath: './src',
-        releasePath: './release',
-        cachePath: './cache',
+        src: './src',
+        release: './release',
+        cache: './cache',
         version: 'v0.24.0',
         rebuild: false,
         platforms: ['win32-ia32', 'darwin-x64']
@@ -38,9 +38,9 @@ When you run code under `process.NODE_ENV = test` more debug information will be
 
 ### `options`
 
-* `cachePath` The download path for the electron package, **required**.
-* `srcPath` The root directory of the sources that shall be packaged, **required**.
-* `releasePath` is where the release applictions path, **required**.
+* `cache` The download path for the electron package, **required**.
+* `src` The root directory of the sources that shall be packaged, **required**.
+* `release` is where the release applictions path, **required**.
 * `version` the version of the electron release to be download from the GitHub page, **required**.
 * `platforms` Support `['darwin','win32','linux','darwin-x64','linux-ia32','linux-x64','win32-ia32','win64-64']`, default is `darwin`. If verion is under `v0.13.0` must use `['darwin','win32','linux']`.
 * `apm` Path to the `atom-package-manager` executable. If not specified the default behavior will be to use the globally installed `apm` executable.

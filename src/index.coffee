@@ -4,6 +4,8 @@ grs = require 'grs'
 path = require 'path'
 async = require 'async'
 wrench = require 'wrench'
+mv = require 'mv'
+rm = require 'rimraf'
 util = require 'gulp-util'
 through2 = require 'through2'
 childProcess = require 'child_process'
@@ -15,9 +17,9 @@ PLUGIN_NAME = 'gulp-electron'
 
 module.exports = electron = (options) ->
   # Options should be like
-  #  cachePath
-  #  srcPath
-  #  releasePath
+  #  cache
+  #  src
+  #  release
   #  platforms: ['darwin', 'win32', 'linux']
   #  apm
   #  rebuild
@@ -26,8 +28,8 @@ module.exports = electron = (options) ->
   #  repo
   options = (options or {})
 
-  if not options.releasePath or not options.version or
-   not options.srcPath or not options.cachePath
+  if not options.release or not options.version or
+   not options.src or not options.cache
     throw new util.PluginError 'Miss version or release path.'
 
   options.platforms ?= ['darwin']
@@ -38,6 +40,7 @@ module.exports = electron = (options) ->
 
   options.platforms = [options.platforms] if typeof options.platforms is 'string'
 
+  
   stream = through2.obj()
 
   platforms = ['darwin',
@@ -58,25 +61,54 @@ module.exports = electron = (options) ->
         stream.emit 'error', "Not support platform #{platform}"
         return callback()
 
-      pkg = "electron-#{options.version}-#{platform}"
-      pkg += '-symbols' if options.symbols
-      pkg += ".#{options.ext}"
+      options.ext ?= "zip"
+      cacheZip = cache = "electron-#{options.version}-#{platform}"
+      cacheZip += '-symbols' if options.symbols
+      cacheZip += ".#{options.ext}"
+      pkgZip = pkg = "#{options.packageJson.name}-#{options.packageJson.version}-#{platform}"
+      pkgZip += '-symbols' if options.symbols
+      pkgZip += ".#{options.ext}"
 
-      cachePath = path.resolve options.cachePath, options.version
-      cacheFile = path.resolve cachePath, pkg
-      releasePath = path.resolve options.releasePath, options.version, platform
+      cachePath = path.resolve options.cache, options.version
+      cacheFile = path.resolve cachePath, cacheZip
+      cacheedPath = path.resolve cachePath, cache
+      pkgZipPwd = path.resolve options.release, options.version
+      releasePath = path.resolve options.release, options.version, platform
+      releaseZipPath = path.resolve options.release, options.version, options.packageJson.name
+
+      src = ""
+      targetApp = ""
+      targetDist = ""
+      suffix = ""
+      releaseDir =  releasePath
+      if platform.indexOf('darwin') >= 0
+        suffix = ".app"
+        electronFile = path.join releasePath , "Electron" + suffix
+      else if platform.indexOf('win') >= 0
+        suffix = ".exe"
+        electronFile = path.join releasePath , "electron" + suffix
+        releaseDir = path.join releasePath, 'Electron.app'
+      else
+        electronFile = path.join releasePath , "electron"
+      binName = options.packageJson.name + suffix
+      targetApp = path.join releasePath , binName
+      _src = 'resources/app'
+      if platform.indexOf('darwin') >= 0
+        _src = binName + '/Contents/Resources/app/'
+      targetDist = path.join releasePath , _src
 
       async.series [
         # If not downloaded then download the special package.
         (next) ->
-          if not isFile(cacheFile)
+          if not isFile cacheFile
+            util.log PLUGIN_NAME, "download #{platform} #{options.version} cache filie."
             wrench.mkdirSyncRecursive cachePath
             # Download electron package throw stream.
             bar = null
             grs
               repo: 'atom/electron'
               tag: options.version
-              name: pkg
+              name: cacheZip
             .on 'error', (error) ->
                stream.emit 'error', error
             .on 'size', (size) ->
@@ -97,10 +129,10 @@ module.exports = electron = (options) ->
         # If not unziped then unzip the zip file.
         # Check if there already have an version file.
         (next) ->
-          if not isFile path.resolve releasePath, 'version'
-            wrench.mkdirSyncRecursive releasePath
+          if not isDir cacheedPath
+            wrench.mkdirSyncRecursive cacheedPath
             util.log PLUGIN_NAME, "unzip #{platform} #{options.version} electron."
-            spawn {cmd: 'unzip', args: ['-o', cacheFile, '-d', releasePath]}, next
+            spawn {cmd: 'unzip', args: ['-o', cacheFile, '-d', cacheedPath]}, next
           else next()
 
         # If rebuild
@@ -113,29 +145,51 @@ module.exports = electron = (options) ->
 
         # Distribute.
         (next) ->
-          util.log PLUGIN_NAME, "#{pkg} distribute done."
-          _src = 'resources/app'
-          if platform.indexOf('darwin') >= 0
-            _src = 'Electron.app/Contents/Resources/app/'
-          wrench.mkdirSyncRecursive path.join releasePath , _src
-          wrench.copyDirSyncRecursive options.srcPath, path.join(releasePath , _src),
+          wrench.mkdirSyncRecursive releasePath
+          wrench.copyDirSyncRecursive cacheedPath, releasePath,
             forceDelete: true
             excludeHiddenUnix: false
             inflateSymlinks: false
-          next null, platform.indexOf('darwin') < 0 and
-            releasePath or
-            path.join releasePath, 'Electron.app'
+          next()
+        (next) ->
+          if not isExists targetApp
+            mv electronFile, targetApp, ->
+              next()
+          else next()
+
+        # Distribute app.
+        (next) ->
+          if not isExists targetDist
+            rm targetDist, next
+          else next()
+        (next) ->
+          util.log PLUGIN_NAME, "#{pkg} distributing"
+          wrench.mkdirSyncRecursive targetDist
+          wrench.copyDirSyncRecursive options.src, targetDist,
+            forceDelete: true
+            excludeHiddenUnix: false
+            inflateSymlinks: false
+          next()
+
+        # packaging app.
+        (next) ->
+          util.log PLUGIN_NAME, "#{pkg} packaging"
+          util.log PLUGIN_NAME, "#{pkgZip} packaging"
+          util.log PLUGIN_NAME, "#{pkgZipPwd} packaging"
+          rm releaseZipPath, ->
+              mv releasePath, releaseZipPath, ->
+                  spawn {
+                      cmd: 'zip'
+                      args: ['-9', '-y', '-r', pkgZip , options.packageJson.name]
+                      opts: {cwd: pkgZipPwd}
+                  }, ->
+                      mv releaseZipPath, releasePath, next
 
       ], (error, results) ->
-        [...,releaseDir] = results
-        execution = switch
-          when platform.indexOf('darwin') >= 0 then 'Contents/MacOS/Electron'
-          when platform.indexOf('win') >= 0 then 'electron.exe'
-          else 'electron'
-
+        util.log PLUGIN_NAME, "#{pkg} distribute done."
         stream.write new File
           base: releaseDir
-          path: path.join releaseDir, execution
+          path: targetApp
 
         callback error
 
@@ -145,9 +199,17 @@ module.exports = electron = (options) ->
 
   return stream
 
+isDir = ->
+  filepath = path.join.apply path, arguments
+  fs.existsSync(filepath) and not fs.statSync(filepath).isFile()
+
 isFile = ->
   filepath = path.join.apply path, arguments
   fs.existsSync(filepath) and fs.statSync(filepath).isFile()
+
+isExists = ->
+  filepath = path.join.apply path, arguments
+  fs.existsSync(filepath)
 
 getApmPath = ->
   apmPath = path.join 'apm', 'node_modules', 'atom-package-manager', 'bin', 'apm'
