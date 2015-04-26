@@ -1,0 +1,28 @@
+# Test against this version of Node.js
+environment:
+  matrix:
+  # node.js
+  - nodejs_version: "0.10"
+  - nodejs_version: "0.11"
+  # io.js
+  - nodejs_version: "1.0.2"
+  - nodejs_version: "1.0.4"
+
+platform:
+  - x86
+  - x64
+
+install:
+  - Install-Product node $env:nodejs_version
+
+# Post-install test scripts.
+test_script:
+  # Output useful info for debugging.
+  - node --version
+  - npm --version
+  # run tests
+  - npm test
+
+# Don't actually build.
+build: off
+
