@@ -67,6 +67,7 @@ module.exports = electron = (options) ->
           throw new PluginError "Not support platform #{platform}"
 
         options.ext ?= "zip"
+        # ex: electron-v0.24.0-darwin-x64.zip
         cacheZip = cache = "electron-#{options.version}-#{platform}"
         cacheZip += '-symbols' if options.symbols
         cacheZip += ".#{options.ext}"
@@ -74,33 +75,40 @@ module.exports = electron = (options) ->
         pkgZip += '-symbols' if options.symbols
         pkgZip += ".#{options.ext}"
 
+        # ex: ./cache/v0.24.0/electron-v0.24.0-darwin-x64.zip
         cachePath = path.resolve options.cache, options.version
         cacheFile = path.resolve cachePath, cacheZip
         cacheedPath = path.resolve cachePath, cache
-        pkgZipPwd = path.resolve options.release, options.version
-        releasePath = path.resolve options.release, options.version, platform
-        releaseZipPath = path.resolve options.release, options.version, packageJson.name
+        pkgZipDir = path.join options.release, options.version
+        pkgZipPath = path.resolve pkgZipDir
+        platformDir = path.join pkgZipDir, platform
+        platformPath = path.resolve platformDir
+        # ex: ./release/v0.24.0/darwin-x64/
+        platformZipDir = path.join pkgZipDir, packageJson.name
+        platformZipPath = path.resolve platformZipDir
 
         src = ""
         targetApp = ""
-        targetDist = ""
+        defaultAppName = "Electron"
         suffix = ""
-        releaseDir =  releasePath
         if platform.indexOf('darwin') >= 0
           suffix = ".app"
-          electronFile = path.join releasePath , "Electron" + suffix
+          electronFile = "Electron" + suffix
         else if platform.indexOf('win') >= 0
           suffix = ".exe"
-          electronFile = path.join releasePath , "electron" + suffix
-          releaseDir = path.join releasePath, 'Electron.app'
+          electronFile = "electron" + suffix
         else
-          electronFile = path.join releasePath , "electron"
+          electronFile = "electron"
+        # ex: ./release/v0.24.0/darwin-x64/Electron
         binName = packageJson.name + suffix
-        targetApp = path.join releasePath , binName
+        targetAppPath = path.join platformPath , binName
         _src = 'resources/app'
         if platform.indexOf('darwin') >= 0
           _src = binName + '/Contents/Resources/app/'
-        targetDist = path.join releasePath , _src
+        # ex: ./release/v0.24.0/darwin-x64/Electron/Contents/resources/app
+        targetDir = path.join packageJson.name, _src
+        targetDirPath = path.resolve platformZipDir, _src
+        targetPath = path.resolve platformPath
 
         async.series [
           # If not downloaded then download the special package.
@@ -150,27 +158,27 @@ module.exports = electron = (options) ->
 
           # Distribute.
           (next) ->
-            wrench.mkdirSyncRecursive releasePath
-            wrench.copyDirSyncRecursive cacheedPath, releasePath,
+            wrench.mkdirSyncRecursive platformPath
+            wrench.copyDirSyncRecursive cacheedPath, platformPath,
               forceDelete: true
               excludeHiddenUnix: false
               inflateSymlinks: false
             next()
           (next) ->
-            if not isExists targetApp
-              mv electronFile, targetApp, ->
+            if not isExists targetAppPath
+              mv electronFile, targetAppPath, ->
                 next()
             else next()
 
           # Distribute app.
           (next) ->
-            if not isExists targetDist
-              rm targetDist, next
+            if not isExists targetDirPath
+              rm targetDirPath, next
             else next()
           (next) ->
-            util.log PLUGIN_NAME, "#{pkg} distributing"
-            wrench.mkdirSyncRecursive targetDist
-            wrench.copyDirSyncRecursive options.src, targetDist,
+            util.log PLUGIN_NAME, "#{options.src} -> #{targetDir} distributing"
+            wrench.mkdirSyncRecursive targetDirPath
+            wrench.copyDirSyncRecursive options.src, targetDirPath,
               forceDelete: true
               excludeHiddenUnix: false
               inflateSymlinks: false
@@ -178,18 +186,21 @@ module.exports = electron = (options) ->
 
           # packaging app.
           (next) ->
-            util.log PLUGIN_NAME, "#{pkgZip} packaging"
-            mv releasePath, releaseZipPath, ->
-                spawn {
-                    cmd: 'zip'
-                    args: ['-9', '-y', '-r', pkgZip , packageJson.name]
-                    opts: {cwd: pkgZipPwd}
-                }, ->
-                    mv releaseZipPath, releasePath, next
+            _target = packageJson.name
+            if not options.rebuild and isExists path.join pkgZipPath, pkgZip
+              _target = targetDir
+            util.log PLUGIN_NAME, "#{path.join pkgZipDir, _target} packaging"
+            mv platformPath, platformZipPath, ->
+              spawn {
+                cmd: 'zip'
+                args: ['-9', '--symlinks', '-r', pkgZip , _target]
+                opts: {cwd: pkgZipPath}
+              }, ->
+                mv platformZipPath, platformPath, next
 
         ], (error, results) ->
-          zip = path.resolve pkgZipPwd, pkgZip
-          util.log PLUGIN_NAME, "#{zip} distribute done."
+          _zip = path.join pkgZipDir, pkgZip
+          util.log PLUGIN_NAME, "#{_zip} distribute done."
           cb()
 
       (error, results) ->
