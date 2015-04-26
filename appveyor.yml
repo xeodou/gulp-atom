@@ -13,7 +13,7 @@ platform:
   - x64
 
 install:
-  - Install-Product node $env:nodejs_version
+  - ps: Install-Product node $env:nodejs_version
 
 # Post-install test scripts.
 test_script:
