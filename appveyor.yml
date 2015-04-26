@@ -3,9 +3,8 @@ environment:
   matrix:
   # node.js
   - nodejs_version: "0.10"
-  - nodejs_version: "0.11"
   # io.js
-  - nodejs_version: "1.0.4"
+  # - nodejs_version: "1.0.4"
 
 platform:
   - x86
@@ -26,4 +25,7 @@ test_script:
 
 # Don't actually build.
 build: off
+
+cache:
+  - example\cache
 

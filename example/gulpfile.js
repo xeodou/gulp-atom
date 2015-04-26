@@ -1,3 +1,5 @@
+'use strict';
+/* jshint node:true */
 
 var electron = require('../');
 var gulp = require('gulp');
@@ -16,7 +18,8 @@ gulp.task('electron', function() {
         release: './release',
         cache: './cache',
         version: 'v0.24.0',
-        rebuild: false,
+        rebuild: true,
+        packaging: true,
         platforms: ['win32-ia32', 'darwin-x64']
     }))
     .pipe(gulp.dest(""));
