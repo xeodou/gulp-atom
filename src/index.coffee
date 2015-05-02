@@ -32,6 +32,8 @@ module.exports = electron = (options) ->
   if not options.release or not options.version or
    not options.src or not options.cache
     throw new PluginError 'Miss version or release path.'
+  if path.resolve(options.src) is path.resolve(".")
+    throw new PluginError 'src path can not root path.'
 
   packageJson = options.packageJson
   if typeof options.packageJson is 'string'
@@ -100,6 +102,8 @@ module.exports = electron = (options) ->
         else
           electronFile = "electron"
         # ex: ./release/v0.24.0/darwin-x64/Electron
+        electronFileDir = path.join platformDir, electronFile
+        electronFilePath = path.resolve electronFileDir
         binName = packageJson.name + suffix
         targetAppPath = path.join platformPath , binName
         _src = 'resources/app'
@@ -107,7 +111,7 @@ module.exports = electron = (options) ->
           _src = binName + '/Contents/Resources/app/'
         # ex: ./release/v0.24.0/darwin-x64/Electron/Contents/resources/app
         targetDir = path.join packageJson.name, _src
-        targetDirPath = path.resolve platformZipDir, _src
+        targetDirPath = path.resolve platformDir, _src
         targetPath = path.resolve platformPath
 
         async.series [
@@ -166,7 +170,7 @@ module.exports = electron = (options) ->
             next()
           (next) ->
             if not isExists targetAppPath
-              mv electronFile, targetAppPath, ->
+              mv electronFilePath, targetAppPath, ->
                 next()
             else next()
 

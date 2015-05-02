@@ -4,7 +4,7 @@
   "description": "A gulp plugin for Electron distribute applications.",
   "main": "index.js",
   "scripts": {
-    "test": "gulp mocha"
+    "test": "gulp mocha && cd example && gulp"
   },
   "keywords": [
     "gulp",
@@ -20,11 +20,10 @@
   "license": "MIT",
   "devDependencies": {
     "gulp": "^3.6.2",
-    "gulp-coffee": "^1.4.3",
-    "gulp-coffeelint": "^0.3.2",
-    "gulp-mocha": "^0.4.1",
-    "gulp-util": "^3.0.4",
-    "should": "^3.3.1"
+    "gulp-coffee": "^2.3.1",
+    "gulp-coffeelint": "^0.4.0",
+    "gulp-mocha": "^2.0.1",
+    "should": "^6.0.1"
   },
   "dependencies": {
     "async": "^0.9.0",
@@ -33,8 +32,8 @@
     "mv": "^2.0.3",
     "progress": "^1.1.5",
     "rimraf": "^2.3.2",
-    "through2": "^0.4.1",
-    "vinyl": "^0.2.3",
+    "through2": "^1.1.1",
+    "vinyl": "^0.4.6",
     "wrench": "^1.5.8"
   }
 }
