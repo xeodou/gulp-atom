@@ -4,11 +4,13 @@ grs = require 'grs'
 path = require 'path'
 async = require 'async'
 wrench = require 'wrench'
+Promise = require 'bluebird'
 mv = require 'mv'
+mvAsync = Promise.promisify mv
 rm = require 'rimraf'
+rmAsync = Promise.promisify rm
 util = require 'gulp-util'
 chalk = require 'chalk'
-Promise = require 'promise-simple'
 Decompress = require 'decompress-zip'
 PluginError = util.PluginError
 through = require 'through2'
@@ -23,13 +25,15 @@ module.exports = electron = (options) ->
   # Options should be like
   #  cache
   #  src
+  #  packageJson
   #  release
   #  platforms: ['darwin', 'win32', 'linux']
   #  apm
-  #  rebuild
   #  symbols
+  #  packaging
   #  version
   #  repo
+  PLUGIN_NAME = 'gulp-electron'
   options = (options or {})
 
   if not options.release or not options.version or
@@ -44,7 +48,6 @@ module.exports = electron = (options) ->
   options.platforms ?= ['darwin']
   options.apm ?= getApmPath()
   options.symbols ?= false
-  options.rebuild ?= false
   options.ext ?= 'zip'
 
   options.platforms = [options.platforms] if typeof options.platforms is 'string'
@@ -64,34 +67,34 @@ module.exports = electron = (options) ->
     'win32-ia32',
     'win32-x64']
 
-    async.eachSeries options.platforms,
-      (platform, cb) ->
-        platform = 'darwin' if platform is 'osx'
-        platform = 'win32' if platform is 'win'
+    Promise.map options.platforms, (platform) ->
+      platform = 'darwin' if platform is 'osx'
+      platform = 'win32' if platform is 'win'
 
-        if platforms.indexOf(platform) < 0
-          throw new PluginError "Not support platform #{platform}"
+      if platforms.indexOf(platform) < 0
+        throw new PluginError PLUGIN_NAME, "Not support platform #{platform}"
 
-        options.ext ?= "zip"
-        # ex: electron-v0.24.0-darwin-x64.zip
-        cacheZip = cache = "electron-#{options.version}-#{platform}"
-        cacheZip += '-symbols' if options.symbols
-        cacheZip += ".#{options.ext}"
-        pkgZip = pkg = "#{packageJson.name}-#{packageJson.version}-#{platform}"
-        pkgZip += '-symbols' if options.symbols
-        pkgZip += ".#{options.ext}"
+      options.ext ?= "zip"
+      # ex: electron-v0.24.0-darwin-x64.zip
+      pkgZip = pkg = "#{packageJson.name}-#{packageJson.version}-#{platform}"
+      pkgZip += '-symbols' if options.symbols
+      pkgZip += ".#{options.ext}"
 
-        # ex: ./cache/v0.24.0/electron-v0.24.0-darwin-x64.zip
-        cachePath = path.resolve options.cache, options.version
-        cacheFile = path.resolve cachePath, cacheZip
-        cacheedPath = path.resolve cachePath, cache
-        # ex: ./release/v0.24.0/
-        pkgZipDir = path.join options.release, options.version
-        pkgZipPath = path.resolve pkgZipDir
-        pkgZipFilePath = path.resolve pkgZipDir, pkgZip
-        # ex: ./release/v0.24.0/darwin-x64/
-        platformDir = path.join pkgZipDir, platform
-        platformPath = path.resolve platformDir
+      cacheZip = cache = "electron-#{options.version}-#{platform}"
+      cacheZip += '-symbols' if options.symbols
+      cacheZip += ".#{options.ext}"
+      # ex: ./cache/v0.24.0/electron-v0.24.0-darwin-x64.zip
+      cachePath = path.resolve options.cache, options.version
+      cacheFile = path.resolve cachePath, cacheZip
+      # ex: ./cache/v0.24.0/electron-v0.24.0-darwin-x64
+      cacheedPath = path.resolve cachePath, cache
+      # ex: ./release/v0.24.0/
+      pkgZipDir = path.join options.release, options.version
+      pkgZipPath = path.resolve pkgZipDir
+      pkgZipFilePath = path.resolve pkgZipDir, pkgZip
+      # ex: ./release/v0.24.0/darwin-x64/
+      platformDir = path.join pkgZipDir, platform
+      platformPath = path.resolve platformDir
 
         targetApp = ""
         defaultAppName = "Electron"
@@ -120,128 +123,104 @@ module.exports = electron = (options) ->
         targetDir = path.join packageJson.name, _src
         targetDirPath = path.resolve platformDir, _src
 
-        copyOption =
-          forceDelete: true
-          excludeHiddenUnix: false
-          inflateSymlinks: false
-        identity = ""
-        if options.platformResouces?.darwin?.identity? and isFile options.platformResouces.darwin.identity
-          identity = fs.readFileSync(options.platformResouces.darwin.identity, 'utf8').trim()
-          ###
-        signingCmd =
-          # http://sevenzip.sourceforge.jp/chm/cmdline/commands/extract.htm
-          darwin: [
-              cmd: 'codesign'
-              args: ['--deep', '--force', '--verbose', '--sign', identity, path.join(targetAppDir ,'Contents', 'Frameworks', 'Electron\\ Framework.framework')]
-            ,
-              cmd: 'codesign'
-              args: ['--deep', '--force', '--verbose', '--sign', identity, path.join(targetAppDir ,'Contents', 'Frameworks', 'Electron\\ Helper EH.app')]
-            ,
-              cmd: 'codesign'
-              args: ['--deep', '--force', '--verbose', '--sign', identity, path.join(targetAppDir ,'Contents', 'Frameworks', 'Electron\\ Helper NP.app')]
-            ,
-              cmd: 'codesign'
-              args: ['--deep', '--force', '--verbose', '--sign', identity, path.join(targetAppDir ,'Contents', 'Frameworks', 'Electron\\ Helper.app')]
-            ,
-              cmd: 'codesign'
-              args: ['--deep', '--force', '--verbose', '--sign', identity, path.join(targetAppDir ,'Contents', 'Frameworks', 'ReactiveCocoa.framework')]
-            ,
-              cmd: 'codesign'
-              args: ['--deep', '--force', '--verbose', '--sign', identity, path.join(targetAppDir ,'Contents', 'Frameworks', 'Squirrel.framework')]
-            ,
-              cmd: 'codesign'
-              args: ['--deep', '--force', '--verbose', '--sign', identity, path.join(targetAppDir,'Contents', 'Frameworks', 'Mantle.framework')]
-            ,
-              cmd: 'codesign'
-              args: ['--deep', '--force', '--verbose', '--sign', identity, targetAppDir]
-          ]
-          ###
-        unpackagingCmd =
-          # http://sevenzip.sourceforge.jp/chm/cmdline/commands/extract.htm
-          #win32:
-            #cmd: '7z'
-            #args: ['x', cacheFile, '-o' + cacheedPath]
-          #http://docs.oracle.com/javase/7/docs/technotes/tools/windows/jar.html
-          win32:
-            cmd: 'jar'
-            args: ['-xMf', cacheFile, cacheedPath]
-          darwin:
-            cmd: 'unzip'
-            args: ['-o', cacheFile, '-d', cacheedPath]
-          ###
-          darwin:
-            cmd: 'ditto'
-            args: [ '-x', targetZip, path.join('..', pkgZip)]
-          ###
-          linux:
-            cmd: 'unzip'
-            args: ['-o', cacheFile, '-d', cacheedPath]
-        packagingCmd =
-          # http://www.appveyor.com/docs/packaging-artifacts#packaging-multiple-files-in-different-locations-into-a-single-archive
-          win32:
-            cmd: '7z',
-            args: ['a', path.join('..', pkgZip), targetZip],
-            opts: {cwd: platformPath}
-          # http://stackoverflow.com/questions/17546016/how-can-you-zip-or-unzip-from-the-command-prompt-using-only-windows-built-in-ca
-          #win32:
-          #cmd: 'jar'
-          #args: ['-cMf', targetZip, path.join('..', pkgZip)]
-          #opts: {cwd: platformPath}
-          darwin:
-            cmd: 'ditto'
-            args: [ '-c', '-k', '--sequesterRsrc', '--keepParent' , targetZip, path.join('..', pkgZip)]
-            opts: {cwd: platformPath}
-          linux:
-            cmd: 'zip'
-            args: ['-9', '-y', '-r', path.join('..', pkgZip) , targetZip]
-            opts: {cwd: platformPath}
+      copyOption =
+        forceDelete: true
+        excludeHiddenUnix: false
+        inflateSymlinks: false
+      identity = ""
+      if options.platformResouces?.darwin?.identity? and isFile options.platformResouces.darwin.identity
+        identity = fs.readFileSync(options.platformResouces.darwin.identity, 'utf8').trim()
+        ###
+      signingCmd =
+        # http://sevenzip.sourceforge.jp/chm/cmdline/commands/extract.htm
+        darwin: [
+            cmd: 'codesign'
+            args: ['--deep', '--force', '--verbose', '--sign', identity, path.join(targetAppDir ,'Contents', 'Frameworks', 'Electron\\ Framework.framework')]
+          ,
+            cmd: 'codesign'
+            args: ['--deep', '--force', '--verbose', '--sign', identity, path.join(targetAppDir ,'Contents', 'Frameworks', 'Electron\\ Helper EH.app')]
+          ,
+            cmd: 'codesign'
+            args: ['--deep', '--force', '--verbose', '--sign', identity, path.join(targetAppDir ,'Contents', 'Frameworks', 'Electron\\ Helper NP.app')]
+          ,
+            cmd: 'codesign'
+            args: ['--deep', '--force', '--verbose', '--sign', identity, path.join(targetAppDir ,'Contents', 'Frameworks', 'Electron\\ Helper.app')]
+          ,
+            cmd: 'codesign'
+            args: ['--deep', '--force', '--verbose', '--sign', identity, path.join(targetAppDir ,'Contents', 'Frameworks', 'ReactiveCocoa.framework')]
+          ,
+            cmd: 'codesign'
+            args: ['--deep', '--force', '--verbose', '--sign', identity, path.join(targetAppDir ,'Contents', 'Frameworks', 'Squirrel.framework')]
+          ,
+            cmd: 'codesign'
+            args: ['--deep', '--force', '--verbose', '--sign', identity, path.join(targetAppDir,'Contents', 'Frameworks', 'Mantle.framework')]
+          ,
+            cmd: 'codesign'
+            args: ['--deep', '--force', '--verbose', '--sign', identity, targetAppDir]
+        ]
+        ###
+      unpackagingCmd =
+        # http://sevenzip.sourceforge.jp/chm/cmdline/commands/extract.htm
+        win32:
+          cmd: '7z'
+          args: ['x', cacheFile, '-o' + cacheedPath]
+        darwin:
+          cmd: 'unzip'
+          args: ['-q', '-o', cacheFile, '-d', cacheedPath]
+        linux:
+          cmd: 'unzip'
+          args: ['-o', cacheFile, '-d', cacheedPath]
+      packagingCmd =
+        # http://www.appveyor.com/docs/packaging-artifacts#packaging-multiple-files-in-different-locations-into-a-single-archive
+        win32:
+          cmd: '7z',
+          args: ['a', path.join('..', pkgZip), targetZip],
+          opts: {cwd: platformPath}
+        darwin:
+          cmd: 'ditto'
+          args: [ '-c', '-k', '--sequesterRsrc', '--keepParent' , targetZip, path.join('..', pkgZip)]
+          opts: {cwd: platformPath}
+        linux:
+          cmd: 'zip'
+          args: ['-9', '-y', '-r', path.join('..', pkgZip) , targetZip]
+          opts: {cwd: platformPath}
 
-        async.series [
+      new Promise (resolve,reject) ->
+        Promise.resolve().then ->
           # If not downloaded then download the special package.
-          (next) ->
-            if not isFile cacheFile
-              util.log PLUGIN_NAME, "download #{platform} #{options.version} cache filie."
-              wrench.mkdirSyncRecursive cachePath
-              # Download electron package throw stream.
-              bar = null
-              grs
-                repo: 'atom/electron'
-                tag: options.version
-                name: cacheZip
-              .on 'error', (error) ->
-                 throw new PluginError error
-              .on 'size', (size) ->
-                bar = new ProgressBar "#{pkg} [:bar] :percent :etas",
-                  complete: '>'
-                  incomplete: ' '
-                  width: 20
-                  total: size
-              .pipe through (chunk, enc, cb) ->
-                bar.tick chunk.length
-                @push(chunk)
-                cb()
-              .pipe(fs.createWriteStream(cacheFile))
-              .on 'close', ->
-                next()
-              .on 'error', next
-            else next()
+          download cacheFile, cacheedPath, options.version, cacheZip
+        .then ->
           # If not unziped then unzip the zip file.
           # Check if there already have an version file.
-          (next) ->
-            util.log PLUGIN_NAME, "unzip #{platformDir} cache filie."
-            util.log PLUGIN_NAME, "download #{platform} #{options.version} cache filie."
-            rm cacheedPath, ->
-              wrench.mkdirSyncRecursive platformDir
-              util.log PLUGIN_NAME, "unzip #{platform} #{options.version} electron."
-              unzip = new Decompress cacheFile
-              unzip.on 'extract', ->
-                next()
-              unzip.extract
-                path: cacheedPath
-                follow: true
-              ###
-              spawn unpackagingCmd[process.platform], next
-              ###
+          unzip cacheFile, cacheedPath, unpackagingCmd[process.platform]
+        .then ->
+          distributeBase platformPath, cacheedPath, copyOption
+        .then ->
+          changeName electronFilePath, targetAppPath
+        .then ->
+          util.log PLUGIN_NAME, "distributeApp #{targetAppDir}"
+          distributeApp options.src, targetDirPath, copyOption
+        .then ->
+          if not options.packaging
+            return Promise.resolve()
+          # FIXME: skip signing
+          return Promise.resolve()
+          ###
+          if platform is "darwin-x64" and process.platform is "darwin"
+            if identity is ""
+              util.log PLUGIN_NAME, "not found identity file. skip signing"
+              return Promise.resolve()
+            signDarwin signingCmd.darwin
+          ###
+        .then ->
+          if not options.packaging
+            return Promise.resolve()
+          packaging pkgZipFilePath, packagingCmd[process.platform]
+        .then ->
+          resolve()
+    .finally ->
+      util.log PLUGIN_NAME, "all distribute done."
+      callback()
 
           # Distribute.
           (next) ->
@@ -331,6 +310,97 @@ getApmPath = ->
   apmPath = path.join 'apm', 'node_modules', 'atom-package-manager', 'bin', 'apm'
   apmPath = 'apm' unless isFile apmPath
 
+download = (cacheFile, cachePath, version, cacheZip) ->
+  if isFile cacheFile
+    util.log PLUGIN_NAME, "download skip: already exists"
+    return Promise.resolve()
+  new Promise (resolve, reject) ->
+    util.log PLUGIN_NAME, "download electron #{cacheZip} cache filie."
+    wrench.mkdirSyncRecursive cachePath
+    # Download electron package throw stream.
+    bar = null
+    grs
+      repo: 'atom/electron'
+      tag: version
+      name: cacheZip
+    .on 'error', (error) ->
+      throw new PluginError PLUGIN_NAME, error
+    .on 'size', (size) ->
+      bar = new ProgressBar "#{cacheFile} [:bar] :percent :etas",
+        complete: '>'
+        incomplete: ' '
+        width: 20
+        total: size
+    .pipe through (chunk, enc, cb) ->
+      bar.tick chunk.length
+      @push(chunk)
+      cb()
+    .pipe(fs.createWriteStream(cacheFile))
+    .on 'close', resolve
+    .on 'error', reject
+
+unzip = (src, target, unpackagingCmd) ->
+  if isExists target
+    return Promise.resolve()
+  return new Promise (resolve, reject) ->
+    ###
+    decompress = new Decompress src
+    decompress.on 'error', reject
+    decompress.on 'extract', ->
+      util.log PLUGIN_NAME, "decompress done #{src}, #{target}"
+      resolve()
+    decompress.extract
+      path: target
+      follow: true
+    ###
+    spawn unpackagingCmd, ->
+      resolve()
+distributeBase = (platformPath, cacheedPath, copyOption) ->
+  if isExists platformPath
+    return Promise.resolve()
+  new Promise (resolve) ->
+    wrench.mkdirSyncRecursive platformPath
+    wrench.copyDirSyncRecursive cacheedPath, platformPath, copyOption
+    resolve()
+
+changeName = (electronFilePath, targetAppPath) ->
+  if isExists targetAppPath
+    return Promise.resolve()
+  new Promise (resolve) ->
+    mvAsync electronFilePath, targetAppPath
+      .then resolve
+distributeApp = (src, targetDirPath, copyOption) ->
+  if isExists targetDirPath
+    util.log PLUGIN_NAME, "distributeApp skip: already exists"
+    return Promise.resolve()
+  new Promise (resolve) ->
+    rmAsync targetDirPath
+      .finally ->
+        wrench.mkdirSyncRecursive targetDirPath
+        wrench.copyDirSyncRecursive src, targetDirPath, copyOption
+        resolve()
+signDarwin = (signingCmd) ->
+  promiseList = []
+  signingCmd.forEach (cmd) ->
+    p = Promise.defer()
+    promiseList.push p
+    spawn cmd, ->
+      p.resolve()
+  Promise.when promiseList
+
+packaging = (pkgZipFilePath, packagingCmd) ->
+  if not isFile pkgZipFilePath
+    return new Promise (resolve) ->
+      cmd = packagingCmd
+      spawn cmd, ->
+        resolve()
+  return new Promise (resolve) ->
+    rmAsync pkgZipFilePath
+      .finally ->
+        cmd = packagingCmd
+        spawn cmd, ->
+          resolve()
+
 spawn = (options, cb) ->
   stdout = []
   stderr = []
@@ -349,6 +419,6 @@ spawn = (options, cb) ->
     error = new Error(signal) if code isnt 0
     results = stderr: stderr.join(''), stdout: stdout.join(''), code: code
     if code isnt 0
-      throw new PluginError PLUGIN_NAME, results.stderr or
+      throw new PluginError 'gulp-electron', results.stderr or
        'unknow error , maybe you can try delete the zip packages.'
     cb error, results
