@@ -48,6 +48,7 @@ module.exports = electron = (options) ->
   options.platforms ?= ['darwin']
   options.apm ?= getApmPath()
   options.symbols ?= false
+  options.packaging ?= true
   options.ext ?= 'zip'
 
   options.platforms = [options.platforms] if typeof options.platforms is 'string'
@@ -96,32 +97,33 @@ module.exports = electron = (options) ->
       platformDir = path.join pkgZipDir, platform
       platformPath = path.resolve platformDir
 
-        targetApp = ""
-        defaultAppName = "Electron"
-        suffix = ""
-        _src = path.join 'resources', 'app'
-        if platform.indexOf('darwin') >= 0
-          suffix = ".app"
-          electronFile = "Electron" + suffix
-          targetZip = packageJson.name + suffix
-          _src = path.join packageJson.name + suffix, 'Contents', 'Resources', 'app'
-        else if platform.indexOf('win') >= 0
-          suffix = ".exe"
-          electronFile = "electron" + suffix
-          targetZip = "."
-        else
-          electronFile = "electron"
-        # ex: ./release/v0.24.0/darwin-x64/Electron
-        electronFileDir = path.join platformDir, electronFile
-        electronFilePath = path.resolve electronFileDir
-        binName = packageJson.name + suffix
-        targetAppPath = path.join platformPath , binName
-        _src = 'resources/app'
-        if platform.indexOf('darwin') >= 0
-          _src = binName + '/Contents/Resources/app/'
-        # ex: ./release/v0.24.0/darwin-x64/Electron/Contents/resources/app
-        targetDir = path.join packageJson.name, _src
-        targetDirPath = path.resolve platformDir, _src
+      targetApp = ""
+      defaultAppName = "Electron"
+      suffix = ""
+      _src = path.join 'resources', 'app'
+      if platform.indexOf('darwin') >= 0
+        suffix = ".app"
+        electronFile = "Electron" + suffix
+        targetZip = packageJson.name + suffix
+        _src = path.join packageJson.name + suffix, 'Contents', 'Resources', 'app'
+      else if platform.indexOf('win') >= 0
+        suffix = ".exe"
+        electronFile = "electron" + suffix
+        targetZip = "."
+      else
+        electronFile = "electron"
+      # ex: ./release/v0.24.0/darwin-x64/Electron
+      electronFileDir = path.join platformDir, electronFile
+      electronFilePath = path.resolve electronFileDir
+      binName = packageJson.name + suffix
+      targetAppDir = path.join platformDir , binName
+      targetAppPath = path.join targetAppDir
+      _src = 'resources/app'
+      if platform.indexOf('darwin') >= 0
+        _src = binName + '/Contents/Resources/app/'
+      # ex: ./release/v0.24.0/darwin-x64/Electron/Contents/resources/app
+      targetDir = path.join packageJson.name, _src
+      targetDirPath = path.resolve platformDir, _src
 
       copyOption =
         forceDelete: true
@@ -221,76 +223,6 @@ module.exports = electron = (options) ->
     .finally ->
       util.log PLUGIN_NAME, "all distribute done."
       callback()
-
-          # Distribute.
-          (next) ->
-            wrench.mkdirSyncRecursive platformPath
-            wrench.copyDirSyncRecursive cacheedPath, platformPath, copyOption
-            next()
-          (next) ->
-            if not isExists targetAppPath
-              mv electronFilePath, targetAppPath, ->
-                next()
-            else next()
-
-          # Distribute app.
-          (next) ->
-            if not isExists targetDirPath
-              rm targetDirPath, next
-            else next()
-          (next) ->
-            util.log PLUGIN_NAME, "#{options.src} -> #{targetDir} distributing"
-            wrench.mkdirSyncRecursive targetDirPath
-            wrench.copyDirSyncRecursive options.src, targetDirPath, copyOption
-            next()
-          # signing
-          (next) ->
-            if not options.packaging
-              return next()
-            # FIXME: skip signing
-            return next()
-            if platform is "darwin-x64" and process.platform is "darwin"
-              if identity is ""
-                util.log PLUGIN_NAME, "not found identity file. skip signing"
-                return next()
-              util.log PLUGIN_NAME, "signing #{platform}"
-              promiseList = []
-              signingCmd.darwin.forEach (cmd) ->
-                p = Promise.defer()
-                promiseList.push p
-                spawn cmd, ->
-                  p.resolve()
-              Promise.when promiseList
-                .then ->
-                  util.log PLUGIN_NAME, "signing done."
-                  next()
-            else next()
-
-          # packaging app.
-          (next) ->
-            if not options.packaging
-              return next()
-            if isFile pkgZipFilePath
-              rm pkgZipFilePath, next
-            else next()
-          (next) ->
-            if not options.packaging
-              return next()
-            util.log PLUGIN_NAME, "packaging"
-            cmd = packagingCmd[process.platform]
-            spawn cmd, ->
-              util.log PLUGIN_NAME, "packaging done"
-              return next()
-
-        ], (error, results) ->
-          _zip = path.join pkgZipDir, pkgZip
-          util.log PLUGIN_NAME, "#{_zip} distribute done."
-          cb()
-
-      (error, results) ->
-        util.log PLUGIN_NAME, "all distribute done."
-        callback()
-    return
 
   return through.obj(bufferContents, endStream)
 
