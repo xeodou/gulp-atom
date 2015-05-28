@@ -8,6 +8,9 @@ node_js:
   - "0.11"
   - "0.10"
   - "iojs-v1.0.4"
+cache:
+  directories:
+  - example/cache
 
 before_script:
   - curl https://gist.github.com/santiycr/5139565/raw/sauce_connect_setup.sh | bash
