@@ -4,7 +4,7 @@ environment:
   # node.js
   - nodejs_version: "0.10"
   # io.js
-  # - nodejs_version: "1.0.4"
+  # - nodejs_version: "2.0.2"
 
 platform:
   - x86
