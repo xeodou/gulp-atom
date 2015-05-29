@@ -45,6 +45,10 @@ Executing `gulp electron` will create an electron package for the specified plat
 
 When you run code under `process.NODE_ENV = test` more debug information will be displayed.
 
+### `Dependency`
+
+If you using windows: install 7z(http://www.7-zip.org/).
+
 ### `options`
 
 * `src` The root directory of the sources that shall be packaged, **required**.
@@ -54,6 +58,8 @@ When you run code under `process.NODE_ENV = test` more debug information will be
 * `version` the version of the electron release to be download from the GitHub page, **required**.
 * `platforms` Support `['darwin','win32','linux','darwin-x64','linux-ia32','linux-x64','win32-ia32','win64-64']`, default is `darwin-x64`. If verion is under `v0.13.0` must use `['darwin','win32','linux']`.
 * `apm` Path to the `atom-package-manager` executable. If not specified the default behavior will be to use the globally installed `apm` executable.
+* `rebuild` Default is `false`, when set to `true` then rebuild native-modules.
+* `asar` Default is `false`, when set to `true` then asar pack your app directory. see more docs(https://github.com/atom/electron/blob/master/docs/tutorial/application-packaging.md).
 * `symbols` Default is `false`, when set to `true` the symbols package from GitHub will be downloaded.
 * `packaging` Default is `false`, when set to `true` the packaging zip file.
 

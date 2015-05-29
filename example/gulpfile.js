@@ -18,7 +18,9 @@ gulp.task('electron', function() {
         release: './release',
         cache: './cache',
         version: 'v0.26.1',
+        rebuild: false,
         packaging: true,
+        asar: true,
         platforms: ['win32-ia32', 'darwin-x64']
     }))
     .pipe(gulp.dest(""));

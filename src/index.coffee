@@ -10,6 +10,7 @@ mvAsync = Promise.promisify mv
 rm = require 'rimraf'
 rmAsync = Promise.promisify rm
 util = require 'gulp-util'
+asar = require 'asar'
 chalk = require 'chalk'
 Decompress = require 'decompress-zip'
 PluginError = util.PluginError
@@ -29,8 +30,10 @@ module.exports = electron = (options) ->
   #  release
   #  platforms: ['darwin', 'win32', 'linux']
   #  apm
-  #  symbols
+  #  rebuild
+  #  asar
   #  packaging
+  #  symbols
   #  version
   #  repo
   PLUGIN_NAME = 'gulp-electron'
@@ -48,6 +51,8 @@ module.exports = electron = (options) ->
   options.platforms ?= ['darwin']
   options.apm ?= getApmPath()
   options.symbols ?= false
+  options.rebuild ?= false
+  options.asar ?= false
   options.packaging ?= true
   options.ext ?= 'zip'
 
@@ -118,12 +123,13 @@ module.exports = electron = (options) ->
       binName = packageJson.name + suffix
       targetAppDir = path.join platformDir , binName
       targetAppPath = path.join targetAppDir
-      _src = 'resources/app'
+      _src = path.join 'resources', 'app'
       if platform.indexOf('darwin') >= 0
-        _src = binName + '/Contents/Resources/app/'
+        _src = path.join binName, 'Contents', 'Resources', 'app'
       # ex: ./release/v0.24.0/darwin-x64/Electron/Contents/resources/app
       targetDir = path.join packageJson.name, _src
       targetDirPath = path.resolve platformDir, _src
+      targetAsarPath = path.resolve platformDir, _src + ".asar"
 
       copyOption =
         forceDelete: true
@@ -200,8 +206,18 @@ module.exports = electron = (options) ->
         .then ->
           changeName electronFilePath, targetAppPath
         .then ->
+          if not options.rebuild
+            return Promise.resolve()
+          util.log PLUGIN_NAME, "Rebuilding modules"
+          rebuild cmd: options.apm, args: ['rebuild']
+        .then ->
           util.log PLUGIN_NAME, "distributeApp #{targetAppDir}"
           distributeApp options.src, targetDirPath, copyOption
+        .then ->
+          if not options.asar
+            return Promise.resolve()
+          util.log PLUGIN_NAME, "packaging app.asar"
+          asarPackaging targetDirPath, targetAsarPath
         .then ->
           if not options.packaging
             return Promise.resolve()
@@ -301,6 +317,7 @@ changeName = (electronFilePath, targetAppPath) ->
   new Promise (resolve) ->
     mvAsync electronFilePath, targetAppPath
       .then resolve
+
 distributeApp = (src, targetDirPath, copyOption) ->
   if isExists targetDirPath
     util.log PLUGIN_NAME, "distributeApp skip: already exists"
@@ -311,6 +328,18 @@ distributeApp = (src, targetDirPath, copyOption) ->
         wrench.mkdirSyncRecursive targetDirPath
         wrench.copyDirSyncRecursive src, targetDirPath, copyOption
         resolve()
+
+rebuild = (cmd) ->
+  new Promise (resolve) ->
+    spawn cmd, resolve
+
+asarPackaging = (src, target) ->
+  util.log PLUGIN_NAME, "packaging app.asar #{src}, #{target}"
+  new Promise (resolve) ->
+    asar.createPackage src, target, ->
+      rmAsync src
+        .finally resolve
+
 signDarwin = (signingCmd) ->
   promiseList = []
   signingCmd.forEach (cmd) ->

@@ -5,9 +5,8 @@ os:
   - osx
 
 node_js:
-  - "0.11"
   - "0.10"
-  - "iojs-v1.0.4"
+  - "iojs-v2.0.2"
 cache:
   directories:
   - example/cache
