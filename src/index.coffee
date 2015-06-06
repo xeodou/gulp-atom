@@ -196,15 +196,13 @@ module.exports = electron = (options) ->
       new Promise (resolve,reject) ->
         Promise.resolve().then ->
           # If not downloaded then download the special package.
-          download cacheFile, cacheedPath, options.version, cacheZip
+          download cacheFile, cachePath, options.version, cacheZip
         .then ->
           # If not unziped then unzip the zip file.
           # Check if there already have an version file.
           unzip cacheFile, cacheedPath, unpackagingCmd[process.platform]
         .then ->
-          distributeBase platformPath, cacheedPath, copyOption
-        .then ->
-          changeName electronFilePath, targetAppPath
+          distributeBase platformPath, cacheedPath, copyOption, electronFilePath, targetAppPath
         .then ->
           if not options.rebuild
             return Promise.resolve()
@@ -303,18 +301,13 @@ unzip = (src, target, unpackagingCmd) ->
     ###
     spawn unpackagingCmd, ->
       resolve()
-distributeBase = (platformPath, cacheedPath, copyOption) ->
-  if isExists platformPath
+distributeBase = (platformPath, cacheedPath, copyOption, electronFilePath, targetAppPath) ->
+  if isExists(platformPath) and isExists(targetAppPath)
+    util.log PLUGIN_NAME, "distributeBase skip: already exists"
     return Promise.resolve()
   new Promise (resolve) ->
     wrench.mkdirSyncRecursive platformPath
     wrench.copyDirSyncRecursive cacheedPath, platformPath, copyOption
-    resolve()
-
-changeName = (electronFilePath, targetAppPath) ->
-  if isExists targetAppPath
-    return Promise.resolve()
-  new Promise (resolve) ->
     mvAsync electronFilePath, targetAppPath
       .then resolve
 
