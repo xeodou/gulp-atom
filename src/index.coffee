@@ -41,9 +41,9 @@ module.exports = electron = (options) ->
 
   if not options.release or not options.version or
    not options.src or not options.cache
-    throw new PluginError 'Miss version or release path.'
+    throw new PluginError PLUGIN_NAME, 'Miss version or release path.'
   if path.resolve(options.src) is path.resolve(".")
-    throw new PluginError 'src path can not root path.'
+    throw new PluginError PLUGIN_NAME, 'src path can not root path.'
 
   packageJson = options.packageJson
   if typeof options.packageJson is 'string'
@@ -373,6 +373,6 @@ spawn = (options, cb) ->
     error = new Error(signal) if code isnt 0
     results = stderr: stderr.join(''), stdout: stdout.join(''), code: code
     if code isnt 0
-      throw new PluginError 'gulp-electron', results.stderr or
+      throw new PluginError PLUGIN_NAME, results.stderr or
        'unknow error , maybe you can try delete the zip packages.'
     cb error, results
