@@ -35,7 +35,21 @@ gulp.task('electron', function() {
         cache: './cache',
         version: 'v0.26.1',
         packaging: true,
-        platforms: ['win32-ia32', 'darwin-x64']
+        platforms: ['win32-ia32', 'darwin-x64'],
+        platformResources: {
+            darwin: {
+                CFBundleDisplayName: packageJson.name,
+                CFBundleIdentifier: packageJson.name,
+                CFBundleName: packageJson.name,
+                CFBundleVersion: packageJson.version,
+                icon: 'gulp-electron.icns'
+            },
+            win: {
+                "version-string": packageJson.version,
+                "file-version": packageJson.version,
+                "product-version": packageJson.version,
+                "icon": 'gulp-electron.ico'
+            }
     }))
     .pipe(gulp.dest(""));
 });
@@ -62,6 +76,21 @@ If you using windows: install 7z(http://www.7-zip.org/).
 * `asar` Default is `false`, when set to `true` then asar pack your app directory. see more docs(https://github.com/atom/electron/blob/master/docs/tutorial/application-packaging.md).
 * `symbols` Default is `false`, when set to `true` the symbols package from GitHub will be downloaded.
 * `packaging` Default is `false`, when set to `true` the packaging zip file.
+
+* `platformResources`
+  * `darwin` Mac resources. See [Core Foundation Keys](https://developer.apple.com/library/ios/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html) for details.
+    * `CFBundleDisplayName` The actual name of the bundle
+    * `CFBundleIdentifier` An identifier string that specifies the app type of the bundle. The string should be in reverse DNS format using only the Roman alphabet in upper and lower case (A–Z, a–z), the dot (“.”), and the hyphen (“-”).
+    * `CFBundleName` The short display name of the bundle.
+    * `CFBundleVersion` The build-version-number string for the bundle.
+    * `CFBundleURLTypes` An array of dictionaries describing the URL schemes supported by the bundle.
+    * `icon` Path to the icon file. `.icns` format
+  * `win` Windows resources. On platforms other then Windows you will need to have [Wine](http://winehq.org) installed and in the system path.
+    * `version-string` - An object containings properties to change of `.exe`
+      version string.
+    * `file-version` File's version to change to.
+    * `product-version` Product's version to change to.
+    * `icon` Path to the icon file. `.ico` format
 
 
 License

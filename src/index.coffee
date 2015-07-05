@@ -18,6 +18,8 @@ through = require 'through2'
 childProcess = require 'child_process'
 ProgressBar = require 'progress'
 File = require 'vinyl'
+plist = require 'plist'
+rcedit = require 'rcedit'
 
 
 PLUGIN_NAME = 'gulp-electron'
@@ -136,8 +138,8 @@ module.exports = electron = (options) ->
         excludeHiddenUnix: false
         inflateSymlinks: false
       identity = ""
-      if options.platformResouces?.darwin?.identity? and isFile options.platformResouces.darwin.identity
-        identity = fs.readFileSync(options.platformResouces.darwin.identity, 'utf8').trim()
+      if options.platformResources?.darwin?.identity? and isFile options.platformResources.darwin.identity
+        identity = fs.readFileSync(options.platformResources.darwin.identity, 'utf8').trim()
         ###
       signingCmd =
         # http://sevenzip.sourceforge.jp/chm/cmdline/commands/extract.htm
@@ -211,6 +213,18 @@ module.exports = electron = (options) ->
         .then ->
           util.log PLUGIN_NAME, "distributeApp #{targetAppDir}"
           distributeApp options.src, targetDirPath, copyOption
+        .then ->
+          if platform.indexOf('darwin') >= 0 && options.platformResources?.darwin?
+            util.log PLUGIN_NAME, "distributePlist #{targetAppDir}"
+            distributePlist options.platformResources.darwin, targetAppPath
+        .then ->
+          if platform.indexOf('darwin') >= 0 && options.platformResources?.darwin?.icon?
+            util.log PLUGIN_NAME, "distributeMacIcon #{targetAppDir}"
+            distributeMacIcon options.platformResources.darwin.icon, targetAppPath
+        .then ->
+          if platform.indexOf('darwin') >= 0 && options.platformResources?.win?
+            util.log PLUGIN_NAME, "distributeWinIcon #{targetAppDir}"
+            distributeWinIcon options.platformResources.win, targetAppPath
         .then ->
           if not options.asar
             return Promise.resolve()
@@ -321,6 +335,41 @@ distributeApp = (src, targetDirPath, copyOption) ->
         wrench.mkdirSyncRecursive targetDirPath
         wrench.copyDirSyncRecursive src, targetDirPath, copyOption
         resolve()
+
+distributePlist = (options, targetAppPath) ->
+  new Promise (resolve) ->
+    contentsPlistDir = path.join targetAppPath, 'Contents', 'Info.plist'
+    helperPlistDir = path.join targetAppPath, 'Contents', 'Frameworks', 'Electron\ Helper.app', 'Contents', 'Info.plist'
+    contentsPlist = plist.parse fs.readFileSync contentsPlistDir, 'utf8'
+    helperPlist = plist.parse fs.readFileSync helperPlistDir, 'utf8'
+    if options.CFBundleDisplayName?
+      contentsPlist.CFBundleDisplayName = options.CFBundleDisplayName
+    if options.CFBundleIdentifier?
+      contentsPlist.CFBundleIdentifier = options.CFBundleIdentifier
+    if options.CFBundleName?
+      contentsPlist.CFBundleName = options.CFBundleName
+    if options.CFBundleVersion?
+      contentsPlist.CFBundleVersion = options.CFBundleVersion
+    if options.CFBundleURLTypes?
+      contentsPlist.CFBundleURLTypes = options.CFBundleURLTypes
+    if options.CFBundleName?
+      helperPlist.CFBundleName = options.CFBundleName
+    if options.CFBundleIdentifier?
+      helperPlist.CFBundleIdentifier = options.CFBundleIdentifier + '.helper'
+    fs.writeFileSync contentsPlistDir, plist.build contentsPlist
+    fs.writeFileSync helperPlistDir, plist.build helperPlist
+    resolve()
+
+distributeMacIcon = (src, targetAppPath) ->
+  new Promise (resolve) ->
+    iconDir = path.join targetAppPath, 'Contents', 'Resources', 'atom.icns'
+    fs.createReadStream(src).pipe fs.createWriteStream iconDir
+    resolve()
+
+distributeWinIcon = (src, targetAppPath) ->
+  new Promise (resolve) ->
+    rcedit targetAppPath, src, resolve
+    resolve()
 
 rebuild = (cmd) ->
   new Promise (resolve) ->
