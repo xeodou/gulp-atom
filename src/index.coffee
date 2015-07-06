@@ -222,7 +222,7 @@ module.exports = electron = (options) ->
             util.log PLUGIN_NAME, "distributeMacIcon #{targetAppDir}"
             distributeMacIcon options.platformResources.darwin.icon, targetAppPath
         .then ->
-          if platform.indexOf('darwin') >= 0 && options.platformResources?.win?
+          if platform.indexOf('win32') >= 0 && options.platformResources?.win?
             util.log PLUGIN_NAME, "distributeWinIcon #{targetAppDir}"
             distributeWinIcon options.platformResources.win, targetAppPath
         .then ->
