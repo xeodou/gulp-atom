@@ -1,9 +1,8 @@
 
-fs = require 'fs'
+fs = require 'fs-extra'
 grs = require 'grs'
 path = require 'path'
 async = require 'async'
-wrench = require 'wrench'
 Promise = require 'bluebird'
 mv = require 'mv'
 mvAsync = Promise.promisify mv
@@ -133,10 +132,6 @@ module.exports = electron = (options) ->
       targetDirPath = path.resolve platformDir, _src
       targetAsarPath = path.resolve platformDir, _src + ".asar"
 
-      copyOption =
-        forceDelete: true
-        excludeHiddenUnix: false
-        inflateSymlinks: false
       identity = ""
       if options.platformResources?.darwin?.identity? and isFile options.platformResources.darwin.identity
         identity = fs.readFileSync(options.platformResources.darwin.identity, 'utf8').trim()
@@ -204,7 +199,7 @@ module.exports = electron = (options) ->
           # Check if there already have an version file.
           unzip cacheFile, cacheedPath, unpackagingCmd[process.platform]
         .then ->
-          distributeBase platformPath, cacheedPath, copyOption, electronFilePath, targetAppPath
+          distributeBase platformPath, cacheedPath, electronFilePath, targetAppPath
         .then ->
           if not options.rebuild
             return Promise.resolve()
@@ -212,7 +207,7 @@ module.exports = electron = (options) ->
           rebuild cmd: options.apm, args: ['rebuild']
         .then ->
           util.log PLUGIN_NAME, "distributeApp #{targetAppDir}"
-          distributeApp options.src, targetDirPath, copyOption
+          distributeApp options.src, targetDirPath
         .then ->
           if platform.indexOf('darwin') >= 0 && options.platformResources?.darwin?
             util.log PLUGIN_NAME, "distributePlist #{targetAppDir}"
@@ -276,7 +271,7 @@ download = (cacheFile, cachePath, version, cacheZip) ->
     return Promise.resolve()
   new Promise (resolve, reject) ->
     util.log PLUGIN_NAME, "download electron #{cacheZip} cache filie."
-    wrench.mkdirSyncRecursive cachePath
+    fs.mkdirsSync cachePath
     # Download electron package throw stream.
     bar = null
     grs
@@ -315,25 +310,25 @@ unzip = (src, target, unpackagingCmd) ->
     ###
     spawn unpackagingCmd, ->
       resolve()
-distributeBase = (platformPath, cacheedPath, copyOption, electronFilePath, targetAppPath) ->
+distributeBase = (platformPath, cacheedPath, electronFilePath, targetAppPath) ->
   if isExists(platformPath) and isExists(targetAppPath)
     util.log PLUGIN_NAME, "distributeBase skip: already exists"
     return Promise.resolve()
   new Promise (resolve) ->
-    wrench.mkdirSyncRecursive platformPath
-    wrench.copyDirSyncRecursive cacheedPath, platformPath, copyOption
+    fs.mkdirsSync platformPath
+    fs.copySync cacheedPath, platformPath
     mvAsync electronFilePath, targetAppPath
       .then resolve
 
-distributeApp = (src, targetDirPath, copyOption) ->
+distributeApp = (src, targetDirPath) ->
   if isExists targetDirPath
     util.log PLUGIN_NAME, "distributeApp skip: already exists"
     return Promise.resolve()
   new Promise (resolve) ->
     rmAsync targetDirPath
       .finally ->
-        wrench.mkdirSyncRecursive targetDirPath
-        wrench.copyDirSyncRecursive src, targetDirPath, copyOption
+        fs.mkdirsSync targetDirPath
+        fs.copySync src, targetDirPath
         resolve()
 
 distributePlist = (options, targetAppPath) ->
