@@ -50,6 +50,7 @@ gulp.task('electron', function() {
                 "product-version": packageJson.version,
                 "icon": 'gulp-electron.ico'
             }
+        }
     }))
     .pipe(gulp.dest(""));
 });
