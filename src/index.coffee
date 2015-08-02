@@ -118,6 +118,7 @@ module.exports = electron = (options) ->
         targetZip = "."
       else
         electronFile = "electron"
+        targetZip = "."
       # ex: ./release/v0.24.0/darwin-x64/Electron
       electronFileDir = path.join platformDir, electronFile
       electronFilePath = path.resolve electronFileDir
