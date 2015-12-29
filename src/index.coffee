@@ -41,7 +41,7 @@ module.exports = electron = (options) ->
   options = (options or {})
 
   if not options.release or not options.version or
-   not options.src or not options.cache
+      not options.src or not options.cache
     throw new PluginError PLUGIN_NAME, 'Miss version or release path.'
   if path.resolve(options.src) is path.resolve(".")
     throw new PluginError PLUGIN_NAME, 'src path can not root path.'
@@ -54,6 +54,8 @@ module.exports = electron = (options) ->
   options.symbols ?= false
   options.rebuild ?= false
   options.asar ?= false
+  options.asarUnpack ?= false
+  options.asarUnpackDir ?= false
   options.packaging ?= true
   options.ext ?= 'zip'
 
@@ -210,22 +212,23 @@ module.exports = electron = (options) ->
           util.log PLUGIN_NAME, "distributeApp #{targetAppDir}"
           distributeApp options.src, targetDirPath
         .then ->
-          if platform.indexOf('darwin') >= 0 && options.platformResources?.darwin?
+          if platform.indexOf('darwin') >= 0 and options.platformResources?.darwin?
             util.log PLUGIN_NAME, "distributePlist #{targetAppDir}"
             distributePlist options.platformResources.darwin, targetAppPath
         .then ->
-          if platform.indexOf('darwin') >= 0 && options.platformResources?.darwin?.icon?
+          if platform.indexOf('darwin') >= 0 and options.platformResources?.darwin?.icon?
             util.log PLUGIN_NAME, "distributeMacIcon #{targetAppDir}"
             distributeMacIcon options.platformResources.darwin.icon, targetAppPath
         .then ->
-          if platform.indexOf('win32') >= 0 && options.platformResources?.win?
+          if platform.indexOf('win32') >= 0 and options.platformResources?.win?
             util.log PLUGIN_NAME, "distributeWinIcon #{targetAppDir}"
             distributeWinIcon options.platformResources.win, targetAppPath
         .then ->
           if not options.asar
             return Promise.resolve()
           util.log PLUGIN_NAME, "packaging app.asar"
-          asarPackaging targetDirPath, targetAsarPath
+          asarPackaging targetDirPath, targetAsarPath,
+           {unpack: options.asarUnpack, unpackDir: options.asarUnpackDir}
         .then ->
           if not options.packaging
             return Promise.resolve()
@@ -371,10 +374,10 @@ rebuild = (cmd) ->
   new Promise (resolve) ->
     spawn cmd, resolve
 
-asarPackaging = (src, target) ->
+asarPackaging = (src, target, opts) ->
   util.log PLUGIN_NAME, "packaging app.asar #{src}, #{target}"
   new Promise (resolve) ->
-    asar.createPackage src, target, ->
+    asar.createPackageWithOptions src, target, opts, ->
       rmAsync src
         .finally resolve
 

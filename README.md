@@ -75,6 +75,8 @@ If you using windows: install 7z(http://www.7-zip.org/).
 * `apm` Path to the `atom-package-manager` executable. If not specified the default behavior will be to use the globally installed `apm` executable.
 * `rebuild` Default is `false`, when set to `true` then rebuild native-modules.
 * `asar` Default is `false`, when set to `true` then asar pack your app directory. see more docs(https://github.com/atom/electron/blob/master/docs/tutorial/application-packaging.md).
+* `asarUnpack` Default is `false`, this options use [minimatch](https://github.com/isaacs/minimatch) to filter out asar file.
+* `asarUnpackDir` Default is `false`, this options filter out asar directory, ex: `vendor` filter out `vendor` dir.
 * `symbols` Default is `false`, when set to `true` the symbols package from GitHub will be downloaded.
 * `packaging` Default is `false`, when set to `true` the packaging zip file.
 
