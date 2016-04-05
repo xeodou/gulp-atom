@@ -35,6 +35,7 @@ gulp.task('electron', function() {
         cache: './cache',
         version: 'v0.26.1',
         packaging: true,
+        token: 'abc123...',
         platforms: ['win32-ia32', 'darwin-x64'],
         platformResources: {
             darwin: {
@@ -79,6 +80,7 @@ If you using windows: install 7z(http://www.7-zip.org/).
 * `asarUnpackDir` Default is `false`, this options filter out asar directory, ex: `vendor` filter out `vendor` dir.
 * `symbols` Default is `false`, when set to `true` the symbols package from GitHub will be downloaded.
 * `packaging` Default is `false`, when set to `true` the packaging zip file.
+* `token` Default is `undefined`, when set to a GitHub authentication token helps prevent rate-limits when downloading Electron releases.
 
 * `platformResources`
   * `darwin` Mac resources. See [Core Foundation Keys](https://developer.apple.com/library/ios/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html) for details.
