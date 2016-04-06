@@ -1,6 +1,6 @@
 {
   "name": "gulp-electron",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "description": "A gulp plugin for Electron distribute applications.",
   "main": "index.js",
   "scripts": {
