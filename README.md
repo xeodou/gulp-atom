@@ -33,7 +33,7 @@ gulp.task('electron', function() {
         packageJson: packageJson,
         release: './release',
         cache: './cache',
-        version: 'v0.26.1',
+        version: 'v0.37.4',
         packaging: true,
         token: 'abc123...',
         platforms: ['win32-ia32', 'darwin-x64'],
