@@ -362,7 +362,7 @@ distributePlist = (options, targetAppPath) ->
 
 distributeMacIcon = (src, targetAppPath) ->
   new Promise (resolve) ->
-    iconDir = path.join targetAppPath, 'Contents', 'Resources', 'atom.icns'
+    iconDir = path.join targetAppPath, 'Contents', 'Resources', 'electron.icns'
     fs.createReadStream(src).pipe fs.createWriteStream iconDir
     resolve()
 
