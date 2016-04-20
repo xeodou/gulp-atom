@@ -12,7 +12,7 @@ var coffeelint = require('gulp-coffeelint');
 var mocha = require('gulp-mocha');
 
 // Files.
-var src = 'src/**/*.coffee';
+var src = '*.coffee';
 var tests = 'test/*.mocha.js';
 
 // Coffee Lint
@@ -28,7 +28,7 @@ gulp.task('coffee', ['lint'], function() {
         .pipe(coffee({
             bare: true
         }).on('error', gutil.log))
-        .pipe(gulp.dest('lib'))
+        .pipe(gulp.dest('.'))
         .on('error', gutil.log);
 });
 
