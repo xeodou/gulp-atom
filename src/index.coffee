@@ -93,13 +93,19 @@ module.exports = electron = (options) ->
       cacheZip = cache = "electron-#{options.version}-#{platform}"
       cacheZip += '-symbols' if options.symbols
       cacheZip += ".#{options.ext}"
+      root = ""
+      if path.isAbsolute(options.cache)
+        root = process.env.PWD
       # ex: ./cache/v0.24.0/electron-v0.24.0-darwin-x64.zip
-      cachePath = path.resolve options.cache, options.version
+      cachePath = path.resolve root, options.cache, options.version
       cacheFile = path.resolve cachePath, cacheZip
       # ex: ./cache/v0.24.0/electron-v0.24.0-darwin-x64
       cacheedPath = path.resolve cachePath, cache
       # ex: ./release/v0.24.0/
-      pkgZipDir = path.join options.release, options.version
+      root = ""
+      if path.isAbsolute(options.cache)
+        root = process.env.PWD
+      pkgZipDir = path.resolve root, options.release, options.version
       pkgZipPath = path.resolve pkgZipDir
       pkgZipFilePath = path.resolve pkgZipDir, pkgZip
       # ex: ./release/v0.24.0/darwin-x64/
@@ -135,6 +141,12 @@ module.exports = electron = (options) ->
       targetDir = path.join packageJson.name, _src
       targetDirPath = path.resolve platformDir, _src
       targetAsarPath = path.resolve platformDir, _src + ".asar"
+
+      contentsPlistDir = path.join targetAppPath, 'Contents', 'Info.plist'
+      helperDir = path.join targetAppPath, 'Contents', 'Frameworks', packageJson.name + '\ Helper.app'
+      helperPlistDir = path.join targetAppPath, 'Contents', 'Frameworks', packageJson.name + '\ Helper.app'
+      helperEHPlistDir = path.join targetAppPath, 'Contents', 'Frameworks', packageJson.name + '\ Helper\ EH.app'
+      helperNPPlistDir = path.join targetAppPath, 'Contents', 'Frameworks', packageJson.name + '\ Helper\ NP.app'
 
       identity = ""
       if options.platformResources?.darwin?.identity? and isFile options.platformResources.darwin.identity
@@ -211,11 +223,17 @@ module.exports = electron = (options) ->
           rebuild cmd: options.apm, args: ['rebuild']
         .then ->
           util.log PLUGIN_NAME, "distributeApp #{targetAppDir}"
-          distributeApp options.src, targetDirPath
+          root = ""
+          if path.isAbsolute(options.cache)
+            root = process.env.PWD
+          distributeApp path.resolve(root, options.src), targetDirPath
         .then ->
           if platform.indexOf('darwin') >= 0 and options.platformResources?.darwin?
-            util.log PLUGIN_NAME, "distributePlist #{targetAppDir}"
-            distributePlist options.platformResources.darwin, targetAppPath
+            distributeHelper helperPlistDir, helperEHPlistDir, helperNPPlistDir, packageJson.name
+        .then ->
+          if platform.indexOf('darwin') >= 0 and options.platformResources?.darwin?
+            util.log PLUGIN_NAME, "distributePlist #{helperPlistDir}"
+            distributePlist options.platformResources.darwin, targetAppPath, helperPlistDir, helperEHPlistDir, helperNPPlistDir
         .then ->
           if platform.indexOf('darwin') >= 0 and options.platformResources?.darwin?.icon?
             util.log PLUGIN_NAME, "distributeMacIcon #{targetAppDir}"
@@ -316,6 +334,7 @@ unzip = (src, target, unpackagingCmd) ->
     ###
     spawn unpackagingCmd, ->
       resolve()
+
 distributeBase = (platformPath, cacheedPath, electronFilePath, targetAppPath) ->
   if isExists(platformPath) and isExists(targetAppPath)
     util.log PLUGIN_NAME, "distributeBase skip: already exists"
@@ -325,6 +344,15 @@ distributeBase = (platformPath, cacheedPath, electronFilePath, targetAppPath) ->
     fs.copySync cacheedPath, platformPath
     mvAsync electronFilePath, targetAppPath
       .then resolve
+
+distributeHelper = (helperPlistDir, helperEHPlistDir, helperNPPlistDir, appName) ->
+  promises = []
+  for file in [helperPlistDir, helperEHPlistDir, helperNPPlistDir]
+    promises.push new Promise (resolve) ->
+      target = file.replace(/Electron/, appName)
+      mvAsync file, target
+        .then resolve
+  Promise.all(promises)
 
 distributeApp = (src, targetDirPath) ->
   if isExists targetDirPath
@@ -337,28 +365,33 @@ distributeApp = (src, targetDirPath) ->
         fs.copySync src, targetDirPath
         resolve()
 
-distributePlist = (options, targetAppPath) ->
+distributePlist = (darwin, targetAppPath, helperPlistDir, helperEHPlistDir, helperNPPlistDir) ->
   new Promise (resolve) ->
-    contentsPlistDir = path.join targetAppPath, 'Contents', 'Info.plist'
-    helperPlistDir = path.join targetAppPath, 'Contents', 'Frameworks', 'Electron\ Helper.app', 'Contents', 'Info.plist'
-    contentsPlist = plist.parse fs.readFileSync contentsPlistDir, 'utf8'
-    helperPlist = plist.parse fs.readFileSync helperPlistDir, 'utf8'
-    if options.CFBundleDisplayName?
-      contentsPlist.CFBundleDisplayName = options.CFBundleDisplayName
-    if options.CFBundleIdentifier?
-      contentsPlist.CFBundleIdentifier = options.CFBundleIdentifier
-    if options.CFBundleName?
-      contentsPlist.CFBundleName = options.CFBundleName
-    if options.CFBundleVersion?
-      contentsPlist.CFBundleVersion = options.CFBundleVersion
-    if options.CFBundleURLTypes?
-      contentsPlist.CFBundleURLTypes = options.CFBundleURLTypes
-    if options.CFBundleName?
-      helperPlist.CFBundleName = options.CFBundleName
-    if options.CFBundleIdentifier?
-      helperPlist.CFBundleIdentifier = options.CFBundleIdentifier + '.helper'
-    fs.writeFileSync contentsPlistDir, plist.build contentsPlist
-    fs.writeFileSync helperPlistDir, plist.build helperPlist
+    contentsPlist = plist.parse fs.readFileSync path.join(targetAppPath, 'Contents', 'Info.plist'), 'utf8'
+    helperPlist = plist.parse fs.readFileSync path.join(helperPlistDir, 'Contents', 'Info.plist'), 'utf8'
+    helperEHPlist = plist.parse fs.readFileSync path.join(helperEHPlistDir, 'Contents', 'Info.plist'), 'utf8'
+    helperNPPlist = plist.parse fs.readFileSync path.join(helperNPPlistDir, 'Contents', 'Info.plist'), 'utf8'
+    if darwin.CFBundleDisplayName?
+      contentsPlist.CFBundleDisplayName = darwin.CFBundleDisplayName
+    if darwin.CFBundleIdentifier?
+      contentsPlist.CFBundleIdentifier = darwin.CFBundleIdentifier
+      helperPlist.CFBundleIdentifier = darwin.CFBundleIdentifier + '.helper'
+      helperEHPlist.CFBundleIdentifier = darwin.CFBundleIdentifier + '.helper.EH'
+      helperNPPlist.CFBundleIdentifier = darwin.CFBundleIdentifier + '.helper.NP'
+    if darwin.CFBundleName?
+      contentsPlist.CFBundleName = darwin.CFBundleName
+      helperPlist.CFBundleName = darwin.CFBundleName + ' Helper'
+      helperEHPlist.CFBundleName = darwin.CFBundleName + ' Helper EH'
+      helperNPPlist.CFBundleName = darwin.CFBundleName + ' Helper NP'
+    util.log PLUGIN_NAME, "helperEHPlist.CFBundleName #{helperEHPlist.CFBundleName}, #{JSON.stringify darwin}"
+    if darwin.CFBundleVersion?
+      contentsPlist.CFBundleVersion = darwin.CFBundleVersion
+    if darwin.CFBundleURLTypes?
+      contentsPlist.CFBundleURLTypes = darwin.CFBundleURLTypes
+    fs.writeFileSync path.join(targetAppPath, 'Contents', 'Info.plist'), plist.build contentsPlist
+    fs.writeFileSync path.join(helperPlistDir, 'Contents', 'Info.plist'), plist.build helperPlist
+    fs.writeFileSync path.join(helperEHPlistDir, 'Contents', 'Info.plist'), plist.build helperEHPlist
+    fs.writeFileSync path.join(helperNPPlistDir, 'Contents', 'Info.plist'), plist.build helperNPPlist
     resolve()
 
 distributeMacIcon = (src, targetAppPath) ->
