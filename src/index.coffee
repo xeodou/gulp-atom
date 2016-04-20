@@ -74,7 +74,8 @@ module.exports = electron = (options) ->
     'linux-ia32',
     'linux-x64',
     'win32-ia32',
-    'win32-x64']
+    'win32-x64',
+    'linux-arm']
 
     Promise.map options.platforms, (platform) ->
       platform = 'darwin' if platform is 'osx'
