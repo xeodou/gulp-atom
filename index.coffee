@@ -93,19 +93,25 @@ module.exports = electron = (options) ->
       cacheZip = cache = "electron-#{options.version}-#{platform}"
       cacheZip += '-symbols' if options.symbols
       cacheZip += ".#{options.ext}"
-      root = ""
-      if path.isAbsolute(options.cache)
-        root = process.env.PWD
+      getUserHome = ->
+        process.env.HOME or process.env.USERPROFILE
+      if not path.isAbsolute(options.cache)
+        if options.cache.match(/^\~/)
+          options.cache = path.join getUserHome(), options.cache.replace(/^\~\//, "")
+        else
+          options.cache = path.resolve options.cache
       # ex: ./cache/v0.24.0/electron-v0.24.0-darwin-x64.zip
-      cachePath = path.resolve root, options.cache, options.version
+      cachePath = path.resolve options.cache, options.version
       cacheFile = path.resolve cachePath, cacheZip
       # ex: ./cache/v0.24.0/electron-v0.24.0-darwin-x64
       cacheedPath = path.resolve cachePath, cache
       # ex: ./release/v0.24.0/
-      root = ""
-      if path.isAbsolute(options.cache)
-        root = process.env.PWD
-      pkgZipDir = path.resolve root, options.release, options.version
+      if not path.isAbsolute(options.release)
+        if options.release.match(/^\~/)
+          options.release = path.join getUserHome(), options.release.replace(/^\~\//, "")
+        else
+          options.release = path.resolve options.release
+      pkgZipDir = path.resolve options.release, options.version
       pkgZipPath = path.resolve pkgZipDir
       pkgZipFilePath = path.resolve pkgZipDir, pkgZip
       # ex: ./release/v0.24.0/darwin-x64/
@@ -223,10 +229,13 @@ module.exports = electron = (options) ->
           rebuild cmd: options.apm, args: ['rebuild']
         .then ->
           util.log PLUGIN_NAME, "distributeApp #{targetAppDir}"
-          root = ""
-          if path.isAbsolute(options.cache)
-            root = process.env.PWD
-          distributeApp path.resolve(root, options.src), targetDirPath
+          if not path.isAbsolute(options.src)
+            if options.src.match(/^\~/)
+              options.src = path.join getUserHome(), options.src.replace(/^\~\//, "")
+            else
+              options.src = path.resolve options.src
+
+          distributeApp options.src, targetDirPath
         .then ->
           if platform.indexOf('darwin') is -1 or not options.platformResources?.darwin?
             return Promise.resolve()

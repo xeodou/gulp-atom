@@ -14,10 +14,10 @@ gulp.task('electron', function() {
 
     gulp.src("")
     .pipe(electron({
-        src: process.env.PWD + '/src',
+        src: 'src',
         packageJson: packageJson,
-        release: process.env.PWD + '/release',
-        cache: process.env.PWD + '/cache',
+        release: 'release',
+        cache: 'cache',
         version: 'v0.37.6',
         rebuild: false,
         packaging: true,

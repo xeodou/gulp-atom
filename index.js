@@ -96,7 +96,7 @@ module.exports = electron = function(options) {
     push = this.push;
     platforms = ['darwin', 'win32', 'linux', 'darwin-x64', 'linux-ia32', 'linux-x64', 'win32-ia32', 'win32-x64', 'linux-arm'];
     return Promise.map(options.platforms, function(platform) {
-      var _src, binName, cache, cacheFile, cachePath, cacheZip, cacheedPath, contentsPlistDir, defaultAppName, electronFile, electronFileDir, electronFilePath, helperDir, helperEHPlistDir, helperNPPlistDir, helperPlistDir, identity, packagingCmd, pkg, pkgZip, pkgZipDir, pkgZipFilePath, pkgZipPath, platformDir, platformPath, ref, ref1, root, suffix, targetApp, targetAppDir, targetAppPath, targetAsarPath, targetDir, targetDirPath, targetZip, unpackagingCmd;
+      var _src, binName, cache, cacheFile, cachePath, cacheZip, cacheedPath, contentsPlistDir, defaultAppName, electronFile, electronFileDir, electronFilePath, getUserHome, helperDir, helperEHPlistDir, helperNPPlistDir, helperPlistDir, identity, packagingCmd, pkg, pkgZip, pkgZipDir, pkgZipFilePath, pkgZipPath, platformDir, platformPath, ref, ref1, suffix, targetApp, targetAppDir, targetAppPath, targetAsarPath, targetDir, targetDirPath, targetZip, unpackagingCmd;
       if (platform === 'osx') {
         platform = 'darwin';
       }
@@ -119,18 +119,27 @@ module.exports = electron = function(options) {
         cacheZip += '-symbols';
       }
       cacheZip += "." + options.ext;
-      root = "";
-      if (path.isAbsolute(options.cache)) {
-        root = process.env.PWD;
+      getUserHome = function() {
+        return process.env.HOME || process.env.USERPROFILE;
+      };
+      if (!path.isAbsolute(options.cache)) {
+        if (options.cache.match(/^\~/)) {
+          options.cache = path.join(getUserHome(), options.cache.replace(/^\~\//, ""));
+        } else {
+          options.cache = path.resolve(options.cache);
+        }
       }
-      cachePath = path.resolve(root, options.cache, options.version);
+      cachePath = path.resolve(options.cache, options.version);
       cacheFile = path.resolve(cachePath, cacheZip);
       cacheedPath = path.resolve(cachePath, cache);
-      root = "";
-      if (path.isAbsolute(options.cache)) {
-        root = process.env.PWD;
+      if (!path.isAbsolute(options.release)) {
+        if (options.release.match(/^\~/)) {
+          options.release = path.join(getUserHome(), options.release.replace(/^\~\//, ""));
+        } else {
+          options.release = path.resolve(options.release);
+        }
       }
-      pkgZipDir = path.resolve(root, options.release, options.version);
+      pkgZipDir = path.resolve(options.release, options.version);
       pkgZipPath = path.resolve(pkgZipDir);
       pkgZipFilePath = path.resolve(pkgZipDir, pkgZip);
       platformDir = path.join(pkgZipDir, platform);
@@ -258,11 +267,14 @@ module.exports = electron = function(options) {
           });
         }).then(function() {
           util.log(PLUGIN_NAME, "distributeApp " + targetAppDir);
-          root = "";
-          if (path.isAbsolute(options.cache)) {
-            root = process.env.PWD;
+          if (!path.isAbsolute(options.src)) {
+            if (options.src.match(/^\~/)) {
+              options.src = path.join(getUserHome(), options.src.replace(/^\~\//, ""));
+            } else {
+              options.src = path.resolve(options.src);
+            }
           }
-          return distributeApp(path.resolve(root, options.src), targetDirPath);
+          return distributeApp(options.src, targetDirPath);
         }).then(function() {
           var ref2;
           if (platform.indexOf('darwin') === -1 || (((ref2 = options.platformResources) != null ? ref2.darwin : void 0) == null)) {
@@ -300,7 +312,6 @@ module.exports = electron = function(options) {
             unpackDir: options.asarUnpackDir
           });
         }).then(function() {
-          util.log(PLUGIN_NAME, "packaging done app.asar");
           if (!options.packaging) {
             return Promise.resolve();
           }
@@ -482,7 +493,6 @@ distributePlist = function(darwin, name, targetAppPath, helperPlistDir, helperEH
       helperEHPlist.CFBundleName = darwin.CFBundleName + '\ Helper EH';
       helperNPPlist.CFBundleName = darwin.CFBundleName + '\ Helper NP';
     }
-    util.log(PLUGIN_NAME, "helperEHPlist.CFBundleName " + helperEHPlist.CFBundleName + ", " + (JSON.stringify(darwin)));
     if (darwin.CFBundleVersion != null) {
       contentsPlist.CFBundleVersion = darwin.CFBundleVersion;
     }
