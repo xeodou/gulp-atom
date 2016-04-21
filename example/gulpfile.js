@@ -6,6 +6,7 @@ var gulp = require('gulp');
 var util = require('gulp-util');
 
 var packageJson = require('./src/package.json');
+var nodeInspector = require('gulp-node-inspector');
 
 process.NODE_ENV = 'test';
 
@@ -39,6 +40,11 @@ gulp.task('electron', function() {
         }
     }))
     .pipe(gulp.dest(""));
+});
+
+gulp.task('debug', function() {
+  gulp.src([])
+    .pipe(nodeInspector());
 });
 
 gulp.task('default', ['electron']);

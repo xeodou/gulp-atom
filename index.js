@@ -165,10 +165,10 @@ module.exports = electron = function(options) {
       targetDirPath = path.resolve(platformDir, _src);
       targetAsarPath = path.resolve(platformDir, _src + ".asar");
       contentsPlistDir = path.join(targetAppPath, 'Contents', 'Info.plist');
-      helperDir = path.join(targetAppPath, 'Contents', 'Frameworks', packageJson.name + '\ Helper.app');
-      helperPlistDir = path.join(targetAppPath, 'Contents', 'Frameworks', packageJson.name + '\ Helper.app');
-      helperEHPlistDir = path.join(targetAppPath, 'Contents', 'Frameworks', packageJson.name + '\ Helper\ EH.app');
-      helperNPPlistDir = path.join(targetAppPath, 'Contents', 'Frameworks', packageJson.name + '\ Helper\ NP.app');
+      helperDir = path.join(targetAppPath, 'Contents', 'Frameworks', 'Electron\ Helper.app');
+      helperPlistDir = path.join(targetAppPath, 'Contents', 'Frameworks', 'Electron\ Helper.app');
+      helperEHPlistDir = path.join(targetAppPath, 'Contents', 'Frameworks', 'Electron\ Helper\ EH.app');
+      helperNPPlistDir = path.join(targetAppPath, 'Contents', 'Frameworks', 'Electron\ Helper\ NP.app');
       identity = "";
       if ((((ref = options.platformResources) != null ? (ref1 = ref.darwin) != null ? ref1.identity : void 0 : void 0) != null) && isFile(options.platformResources.darwin.identity)) {
         identity = fs.readFileSync(options.platformResources.darwin.identity, 'utf8').trim();
@@ -265,27 +265,31 @@ module.exports = electron = function(options) {
           return distributeApp(path.resolve(root, options.src), targetDirPath);
         }).then(function() {
           var ref2;
-          if (platform.indexOf('darwin') >= 0 && (((ref2 = options.platformResources) != null ? ref2.darwin : void 0) != null)) {
-            return distributeHelper(helperPlistDir, helperEHPlistDir, helperNPPlistDir, packageJson.name);
+          if (platform.indexOf('darwin') === -1 || (((ref2 = options.platformResources) != null ? ref2.darwin : void 0) == null)) {
+            return Promise.resolve();
           }
+          util.log(PLUGIN_NAME, "distributePlist " + helperPlistDir);
+          return distributePlist(options.platformResources.darwin, packageJson.name, targetAppPath, helperPlistDir, helperEHPlistDir, helperNPPlistDir);
         }).then(function() {
           var ref2;
-          if (platform.indexOf('darwin') >= 0 && (((ref2 = options.platformResources) != null ? ref2.darwin : void 0) != null)) {
-            util.log(PLUGIN_NAME, "distributePlist " + helperPlistDir);
-            return distributePlist(options.platformResources.darwin, targetAppPath, helperPlistDir, helperEHPlistDir, helperNPPlistDir);
+          if (platform.indexOf('darwin') === -1 || (((ref2 = options.platformResources) != null ? ref2.darwin : void 0) == null)) {
+            return Promise.resolve();
           }
-        }).then(function() {
-          var ref2, ref3;
-          if (platform.indexOf('darwin') >= 0 && (((ref2 = options.platformResources) != null ? (ref3 = ref2.darwin) != null ? ref3.icon : void 0 : void 0) != null)) {
-            util.log(PLUGIN_NAME, "distributeMacIcon " + targetAppDir);
-            return distributeMacIcon(options.platformResources.darwin.icon, targetAppPath);
-          }
+          return distributeHelper(helperPlistDir, helperEHPlistDir, helperNPPlistDir, packageJson.name);
         }).then(function() {
           var ref2;
-          if (platform.indexOf('win32') >= 0 && (((ref2 = options.platformResources) != null ? ref2.win : void 0) != null)) {
-            util.log(PLUGIN_NAME, "distributeWinIcon " + targetAppDir);
-            return distributeWinIcon(options.platformResources.win, targetAppPath);
+          if (platform.indexOf('darwin') === -1 || (((ref2 = options.platformResources) != null ? ref2.darwin : void 0) == null)) {
+            return Promise.resolve();
           }
+          util.log(PLUGIN_NAME, "distributeMacIcon " + targetAppDir);
+          return distributeMacIcon(options.platformResources.darwin.icon, targetAppPath);
+        }).then(function() {
+          var ref2;
+          if (platform.indexOf('win32') === -1 || (((ref2 = options.platformResources) != null ? ref2.win : void 0) == null)) {
+            return Promise.resolve();
+          }
+          util.log(PLUGIN_NAME, "distributeWinIcon " + targetAppDir);
+          return distributeWinIcon(options.platformResources.win, targetAppPath);
         }).then(function() {
           if (!options.asar) {
             return Promise.resolve();
@@ -296,6 +300,7 @@ module.exports = electron = function(options) {
             unpackDir: options.asarUnpackDir
           });
         }).then(function() {
+          util.log(PLUGIN_NAME, "packaging done app.asar");
           if (!options.packaging) {
             return Promise.resolve();
           }
@@ -413,20 +418,26 @@ distributeBase = function(platformPath, cacheedPath, electronFilePath, targetApp
   return new Promise(function(resolve) {
     fs.mkdirsSync(platformPath);
     fs.copySync(cacheedPath, platformPath);
-    return mvAsync(electronFilePath, targetAppPath).then(resolve);
+    return mvAsync(electronFilePath, targetAppPath, {
+      mkdirp: true
+    }).then(resolve);
   });
 };
 
 distributeHelper = function(helperPlistDir, helperEHPlistDir, helperNPPlistDir, appName) {
-  var file, i, len, promises, ref;
+  var file, i, len, promises, ref, target;
   promises = [];
   ref = [helperPlistDir, helperEHPlistDir, helperNPPlistDir];
   for (i = 0, len = ref.length; i < len; i++) {
     file = ref[i];
-    promises.push(new Promise(function(resolve) {
-      var target;
-      target = file.replace(/Electron/, appName);
-      return mvAsync(file, target).then(resolve);
+    if (!isExists(file)) {
+      continue;
+    }
+    target = file.replace(/Electron/, appName);
+    util.log(PLUGIN_NAME, "distributeHelper " + file);
+    util.log(PLUGIN_NAME, "distributeHelper " + target);
+    promises.push(mvAsync(file, target, {
+      mkdirp: true
     }));
   }
   return Promise.all(promises);
@@ -446,9 +457,12 @@ distributeApp = function(src, targetDirPath) {
   });
 };
 
-distributePlist = function(darwin, targetAppPath, helperPlistDir, helperEHPlistDir, helperNPPlistDir) {
+distributePlist = function(darwin, name, targetAppPath, helperPlistDir, helperEHPlistDir, helperNPPlistDir) {
   return new Promise(function(resolve) {
     var contentsPlist, helperEHPlist, helperNPPlist, helperPlist;
+    helperPlistDir = helperPlistDir.replace(/Electron/, name);
+    helperEHPlistDir = helperEHPlistDir.replace(/Electron/, name);
+    helperNPPlistDir = helperNPPlistDir.replace(/Electron/, name);
     contentsPlist = plist.parse(fs.readFileSync(path.join(targetAppPath, 'Contents', 'Info.plist'), 'utf8'));
     helperPlist = plist.parse(fs.readFileSync(path.join(helperPlistDir, 'Contents', 'Info.plist'), 'utf8'));
     helperEHPlist = plist.parse(fs.readFileSync(path.join(helperEHPlistDir, 'Contents', 'Info.plist'), 'utf8'));
@@ -464,9 +478,9 @@ distributePlist = function(darwin, targetAppPath, helperPlistDir, helperEHPlistD
     }
     if (darwin.CFBundleName != null) {
       contentsPlist.CFBundleName = darwin.CFBundleName;
-      helperPlist.CFBundleName = darwin.CFBundleName + ' Helper';
-      helperEHPlist.CFBundleName = darwin.CFBundleName + ' Helper EH';
-      helperNPPlist.CFBundleName = darwin.CFBundleName + ' Helper NP';
+      helperPlist.CFBundleName = darwin.CFBundleName + '\ Helper';
+      helperEHPlist.CFBundleName = darwin.CFBundleName + '\ Helper EH';
+      helperNPPlist.CFBundleName = darwin.CFBundleName + '\ Helper NP';
     }
     util.log(PLUGIN_NAME, "helperEHPlist.CFBundleName " + helperEHPlist.CFBundleName + ", " + (JSON.stringify(darwin)));
     if (darwin.CFBundleVersion != null) {
@@ -506,10 +520,13 @@ rebuild = function(cmd) {
 };
 
 asarPackaging = function(src, target, opts) {
-  util.log(PLUGIN_NAME, "packaging app.asar " + src + ", " + target);
+  var escSrc, escTarget;
+  escSrc = src.replace(/(\\\s)/, "\\ ");
+  escTarget = target.replace(/(\\\s)/, "\\ ");
   return new Promise(function(resolve) {
-    return asar.createPackageWithOptions(src, target, opts, function() {
-      return rmAsync(src)["finally"](resolve);
+    util.log(PLUGIN_NAME, "packaging app.asar " + escSrc + ", " + escTarget);
+    return asar.createPackageWithOptions(escSrc, escTarget, opts, function() {
+      return resolve();
     });
   });
 };
