@@ -1,4 +1,4 @@
-var Decompress, File, PLUGIN_NAME, PluginError, ProgressBar, Promise, asar, asarPackaging, async, chalk, childProcess, distributeApp, distributeBase, distributeHelper, distributeMacIcon, distributePlist, distributeWinIcon, download, electron, fs, getApmPath, grs, isDir, isExists, isFile, mv, mvAsync, packaging, path, plist, rcedit, rebuild, rm, rmAsync, signDarwin, spawn, through, unzip, util;
+var Decompress, File, PLUGIN_NAME, PluginError, ProgressBar, Promise, asar, asarPackaging, async, chalk, childProcess, distributeApp, distributeBase, distributeMacIcon, distributePlist, distributeWinIcon, download, electron, fs, getApmPath, grs, isDir, isExists, isFile, mv, mvAsync, packaging, path, plist, rcedit, rebuild, rm, rmAsync, signDarwin, spawn, through, unzip, util;
 
 fs = require('fs-extra');
 
@@ -96,7 +96,7 @@ module.exports = electron = function(options) {
     push = this.push;
     platforms = ['darwin', 'win32', 'linux', 'darwin-x64', 'linux-ia32', 'linux-x64', 'win32-ia32', 'win32-x64', 'linux-arm'];
     return Promise.map(options.platforms, function(platform) {
-      var _src, binName, cache, cacheFile, cachePath, cacheZip, cacheedPath, contentsPlistDir, defaultAppName, electronFile, electronFileDir, electronFilePath, getUserHome, helperDir, helperEHPlistDir, helperNPPlistDir, helperPlistDir, identity, packagingCmd, pkg, pkgZip, pkgZipDir, pkgZipFilePath, pkgZipPath, platformDir, platformPath, ref, ref1, suffix, targetApp, targetAppDir, targetAppPath, targetAsarPath, targetDir, targetDirPath, targetZip, unpackagingCmd;
+      var _src, binName, cache, cacheFile, cachePath, cacheZip, cacheedPath, contentsPlistDir, defaultAppName, electronFile, electronFileDir, electronFilePath, getUserHome, identity, packagingCmd, pkg, pkgZip, pkgZipDir, pkgZipFilePath, pkgZipPath, platformDir, platformPath, ref, ref1, suffix, targetApp, targetAppDir, targetAppPath, targetAsarPath, targetDir, targetDirPath, targetZip, unpackagingCmd;
       if (platform === 'osx') {
         platform = 'darwin';
       }
@@ -174,10 +174,6 @@ module.exports = electron = function(options) {
       targetDirPath = path.resolve(platformDir, _src);
       targetAsarPath = path.resolve(platformDir, _src + ".asar");
       contentsPlistDir = path.join(targetAppPath, 'Contents', 'Info.plist');
-      helperDir = path.join(targetAppPath, 'Contents', 'Frameworks', 'Electron\ Helper.app');
-      helperPlistDir = path.join(targetAppPath, 'Contents', 'Frameworks', 'Electron\ Helper.app');
-      helperEHPlistDir = path.join(targetAppPath, 'Contents', 'Frameworks', 'Electron\ Helper\ EH.app');
-      helperNPPlistDir = path.join(targetAppPath, 'Contents', 'Frameworks', 'Electron\ Helper\ NP.app');
       identity = "";
       if ((((ref = options.platformResources) != null ? (ref1 = ref.darwin) != null ? ref1.identity : void 0 : void 0) != null) && isFile(options.platformResources.darwin.identity)) {
         identity = fs.readFileSync(options.platformResources.darwin.identity, 'utf8').trim();
@@ -280,14 +276,8 @@ module.exports = electron = function(options) {
           if (platform.indexOf('darwin') === -1 || (((ref2 = options.platformResources) != null ? ref2.darwin : void 0) == null)) {
             return Promise.resolve();
           }
-          util.log(PLUGIN_NAME, "distributePlist " + helperPlistDir);
-          return distributePlist(options.platformResources.darwin, packageJson.name, targetAppPath, helperPlistDir, helperEHPlistDir, helperNPPlistDir);
-        }).then(function() {
-          var ref2;
-          if (platform.indexOf('darwin') === -1 || (((ref2 = options.platformResources) != null ? ref2.darwin : void 0) == null)) {
-            return Promise.resolve();
-          }
-          return distributeHelper(helperPlistDir, helperEHPlistDir, helperNPPlistDir, packageJson.name);
+          util.log(PLUGIN_NAME, "distributePlist " + targetAppPath);
+          return distributePlist(options.platformResources.darwin, packageJson.name, targetAppPath);
         }).then(function() {
           var ref2;
           if (platform.indexOf('darwin') === -1 || (((ref2 = options.platformResources) != null ? ref2.darwin : void 0) == null)) {
@@ -435,25 +425,6 @@ distributeBase = function(platformPath, cacheedPath, electronFilePath, targetApp
   });
 };
 
-distributeHelper = function(helperPlistDir, helperEHPlistDir, helperNPPlistDir, appName) {
-  var file, i, len, promises, ref, target;
-  promises = [];
-  ref = [helperPlistDir, helperEHPlistDir, helperNPPlistDir];
-  for (i = 0, len = ref.length; i < len; i++) {
-    file = ref[i];
-    if (!isExists(file)) {
-      continue;
-    }
-    target = file.replace(/Electron/, appName);
-    util.log(PLUGIN_NAME, "distributeHelper " + file);
-    util.log(PLUGIN_NAME, "distributeHelper " + target);
-    promises.push(mvAsync(file, target, {
-      mkdirp: true
-    }));
-  }
-  return Promise.all(promises);
-};
-
 distributeApp = function(src, targetDirPath) {
   if (isExists(targetDirPath)) {
     util.log(PLUGIN_NAME, "distributeApp skip: already exists");
@@ -468,42 +439,38 @@ distributeApp = function(src, targetDirPath) {
   });
 };
 
-distributePlist = function(darwin, name, targetAppPath, helperPlistDir, helperEHPlistDir, helperNPPlistDir) {
+distributePlist = function(darwin, name, targetAppPath) {
   return new Promise(function(resolve) {
-    var contentsPlist, helperEHPlist, helperNPPlist, helperPlist;
-    helperPlistDir = helperPlistDir.replace(/Electron/, name);
-    helperEHPlistDir = helperEHPlistDir.replace(/Electron/, name);
-    helperNPPlistDir = helperNPPlistDir.replace(/Electron/, name);
+    var _binaryDest, _binarySrc, contentsPlist;
     contentsPlist = plist.parse(fs.readFileSync(path.join(targetAppPath, 'Contents', 'Info.plist'), 'utf8'));
-    helperPlist = plist.parse(fs.readFileSync(path.join(helperPlistDir, 'Contents', 'Info.plist'), 'utf8'));
-    helperEHPlist = plist.parse(fs.readFileSync(path.join(helperEHPlistDir, 'Contents', 'Info.plist'), 'utf8'));
-    helperNPPlist = plist.parse(fs.readFileSync(path.join(helperNPPlistDir, 'Contents', 'Info.plist'), 'utf8'));
     if (darwin.CFBundleDisplayName != null) {
       contentsPlist.CFBundleDisplayName = darwin.CFBundleDisplayName;
     }
     if (darwin.CFBundleIdentifier != null) {
       contentsPlist.CFBundleIdentifier = darwin.CFBundleIdentifier;
-      helperPlist.CFBundleIdentifier = darwin.CFBundleIdentifier + '.helper';
-      helperEHPlist.CFBundleIdentifier = darwin.CFBundleIdentifier + '.helper.EH';
-      helperNPPlist.CFBundleIdentifier = darwin.CFBundleIdentifier + '.helper.NP';
     }
     if (darwin.CFBundleName != null) {
       contentsPlist.CFBundleName = darwin.CFBundleName;
-      helperPlist.CFBundleName = darwin.CFBundleName + '\ Helper';
-      helperEHPlist.CFBundleName = darwin.CFBundleName + '\ Helper EH';
-      helperNPPlist.CFBundleName = darwin.CFBundleName + '\ Helper NP';
     }
     if (darwin.CFBundleVersion != null) {
       contentsPlist.CFBundleVersion = darwin.CFBundleVersion;
+    }
+    if (darwin.CFBundleExecutable != null) {
+      contentsPlist.CFBundleExecutable = darwin.CFBundleExecutable;
     }
     if (darwin.CFBundleURLTypes != null) {
       contentsPlist.CFBundleURLTypes = darwin.CFBundleURLTypes;
     }
     fs.writeFileSync(path.join(targetAppPath, 'Contents', 'Info.plist'), plist.build(contentsPlist));
-    fs.writeFileSync(path.join(helperPlistDir, 'Contents', 'Info.plist'), plist.build(helperPlist));
-    fs.writeFileSync(path.join(helperEHPlistDir, 'Contents', 'Info.plist'), plist.build(helperEHPlist));
-    fs.writeFileSync(path.join(helperNPPlistDir, 'Contents', 'Info.plist'), plist.build(helperNPPlist));
-    return resolve();
+    if (darwin.CFBundleExecutable != null) {
+      _binarySrc = path.join(targetAppPath, 'Contents', 'MacOS', 'Electron');
+      _binaryDest = path.join(targetAppPath, 'Contents', 'MacOS', darwin.CFBundleExecutable);
+      return mvAsync(_binarySrc, _binaryDest, {
+        mkdirp: true
+      }).then(resolve);
+    } else {
+      return resolve();
+    }
   });
 };
 
